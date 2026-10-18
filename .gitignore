@@ -39,3 +39,4 @@ Thumbs.db
 *.dll
 vcpkg_installed/
 Testing/
+/wardogs-data/assets

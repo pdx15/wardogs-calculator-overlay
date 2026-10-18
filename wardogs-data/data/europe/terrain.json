@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "europe",
+  "world": "Europe",
+  "gameBuild": "25937608",
+  "units": "meters",
+  "bounds": {
+    "min": [
+      -16328.22,
+      -16325.8
+    ],
+    "max": [
+      5.93,
+      4.37
+    ]
+  },
+  "zRange": {
+    "min": -1044.8,
+    "max": 0.04
+  },
+  "heightmap": {
+    "file": "heightmap.png",
+    "width": 8192,
+    "height": 8192,
+    "bitDepth": 16,
+    "metersPerPixel": [
+      1.993915283,
+      1.993428955
+    ],
+    "encoding": "z = zRange.min + value / 65535 * (zRange.max - zRange.min)"
+  },
+  "check": {
+    "buildings": 331,
+    "medianOffset": -1.05,
+    "p5Offset": -1.85,
+    "p95Offset": -0.29,
+    "fractionWithin5m": 1
+  }
+}

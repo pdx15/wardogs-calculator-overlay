@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "kavkazi",
+  "name": "Bakurani",
+  "world": "Kavkazi",
+  "gameBuild": "25937608",
+  "units": "meters",
+  "bounds": {
+    "min": [
+      -16320,
+      -20400
+    ],
+    "max": [
+      0,
+      -4080
+    ]
+  },
+  "image": {
+    "width": 16384,
+    "height": 16384,
+    "metersPerPixel": 1,
+    "padding": {
+      "right": 64,
+      "bottom": 64
+    }
+  },
+  "tiles": {
+    "size": 256,
+    "minZoom": 0,
+    "maxZoom": 6,
+    "format": "webp",
+    "urlTemplate": "tiles/{z}/{x}/{y}.webp"
+  }
+}

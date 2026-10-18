@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "kavkazi",
+  "world": "Kavkazi",
+  "gameBuild": "25937608",
+  "units": "meters",
+  "bounds": {
+    "min": [
+      -16320,
+      -20400
+    ],
+    "max": [
+      0,
+      -4080
+    ]
+  },
+  "zRange": {
+    "min": -1008.27,
+    "max": 106.47
+  },
+  "heightmap": {
+    "file": "heightmap.png",
+    "width": 8192,
+    "height": 8192,
+    "bitDepth": 16,
+    "metersPerPixel": [
+      1.9921875,
+      1.9921875
+    ],
+    "encoding": "z = zRange.min + value / 65535 * (zRange.max - zRange.min)"
+  },
+  "check": {
+    "buildings": 432,
+    "medianOffset": -1.29,
+    "p5Offset": -1.94,
+    "p95Offset": -0.14,
+    "fractionWithin5m": 1
+  }
+}

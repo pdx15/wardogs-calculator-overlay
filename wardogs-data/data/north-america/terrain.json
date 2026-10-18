@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "north-america",
+  "world": "NorthAmerica",
+  "gameBuild": "25937608",
+  "units": "meters",
+  "bounds": {
+    "min": [
+      -8162,
+      -8162
+    ],
+    "max": [
+      8162,
+      8162
+    ]
+  },
+  "zRange": {
+    "min": 0,
+    "max": 1225
+  },
+  "heightmap": {
+    "file": "heightmap.png",
+    "width": 8192,
+    "height": 8192,
+    "bitDepth": 16,
+    "metersPerPixel": [
+      1.992675781,
+      1.992675781
+    ],
+    "encoding": "z = zRange.min + value / 65535 * (zRange.max - zRange.min)"
+  },
+  "check": {
+    "buildings": 213,
+    "medianOffset": -0.63,
+    "p5Offset": -3.28,
+    "p95Offset": 0.32,
+    "fractionWithin5m": 1
+  }
+}

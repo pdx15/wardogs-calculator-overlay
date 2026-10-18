@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "europe",
+  "name": "Ozeti",
+  "world": "Europe",
+  "gameBuild": "25937608",
+  "units": "meters",
+  "bounds": {
+    "min": [
+      -16160,
+      -16160
+    ],
+    "max": [
+      160,
+      160
+    ]
+  },
+  "image": {
+    "width": 16384,
+    "height": 16384,
+    "metersPerPixel": 1,
+    "padding": {
+      "right": 64,
+      "bottom": 64
+    }
+  },
+  "tiles": {
+    "size": 256,
+    "minZoom": 0,
+    "maxZoom": 6,
+    "format": "webp",
+    "urlTemplate": "tiles/{z}/{x}/{y}.webp"
+  }
+}

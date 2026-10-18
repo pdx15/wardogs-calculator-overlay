@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "north-america",
+  "name": "Zestafona",
+  "world": "NorthAmerica",
+  "gameBuild": "25937608",
+  "units": "meters",
+  "bounds": {
+    "min": [
+      -8192,
+      -8192
+    ],
+    "max": [
+      8192,
+      8192
+    ]
+  },
+  "image": {
+    "width": 16384,
+    "height": 16384,
+    "metersPerPixel": 1,
+    "padding": {
+      "right": 0,
+      "bottom": 0
+    }
+  },
+  "tiles": {
+    "size": 256,
+    "minZoom": 0,
+    "maxZoom": 6,
+    "format": "webp",
+    "urlTemplate": "tiles/{z}/{x}/{y}.webp"
+  }
+}

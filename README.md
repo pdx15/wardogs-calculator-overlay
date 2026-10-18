@@ -8,7 +8,7 @@ Displays MIL, azimuth, and distance with full terrain height correction.
 - **Ballistic tables** — L81 Mortar and SPH-2 (low + high arc)
 - **Hull heading correction** — SPH-2 platform model (pitch 5°)
 - **Field calibration** — Bakurani high-arc profile
-- **Terrain height correction** — loads 16-bit PNG heightmaps from [wardogs-data](https://github.com/warpuppies/wardogs-data)
+- **Terrain height correction** — loads 16-bit PNG heightmaps from wardogs-data
 - **Always-on-top overlay** — F10 hide, F11 click-through, F12 reset
 - **System tray icon** — left-click toggles overlay, right-click for menu
 
@@ -48,39 +48,11 @@ cmake --build . --config Release
 
 Output: `build/calculator.exe` (or `build/calculator` on Linux)
 
-## Terrain data
-
-The calculator loads 16-bit PNG heightmaps from the
-[wardogs-data](https://github.com/warpuppies/wardogs-data) dataset.
-
-### Download
-
-Download the latest release zip from the wardogs-data GitHub repository and extract to any local directory (e.g. `~/wardogs-data/`).
-
-### Directory structure
-
-```
-wardogs-data/
-├── assets/maps/kavkazi/heightmap.png   ← 16-bit grayscale (8192×8192)
-├── data/maps/kavkazi/terrain.json      ← bounds, zRange encoding
-└── data/maps/kavkazi/map.json          ← map metadata
-```
-
 ### Loading in the app
 
 1. Enter the path to your `wardogs-data` directory in the **wardogs-data directory** field
 2. Click **Load** (or press Enter)
 3. Status shows "OK" when terrain is loaded
-
-Map coordinates are in game metres:
-
-| Map | World | X range | Y range |
-|-----|-------|---------|---------|
-| Bakurani | kavkazi | [-16320, 0] | [-20400, -4080] |
-| Ozeti | europe | [-16160, 160] | [-16160, 160] |
-| Zestafona | north-america | [-8192, 8192] | [-8192, 8192] |
-
-Terrain auto-reloads when you switch maps.
 
 ## Hotkeys
 
