@@ -72,7 +72,14 @@ wardogs-data/
 2. Click **Load** (or press Enter)
 3. Status shows "OK" when terrain is loaded
 
-Map coordinates are in game metres (e.g. Bakurani: X ∈ [-16320, 0], Y ∈ [-20400, -4080]).
+Map coordinates are in game metres:
+
+| Map | World | X range | Y range |
+|-----|-------|---------|---------|
+| Bakurani | kavkazi | [-16320, 0] | [-20400, -4080] |
+| Ozeti | europe | [-16160, 160] | [-16160, 160] |
+| Zestafona | north-america | [-8192, 8192] | [-8192, 8192] |
+
 Terrain auto-reloads when you switch maps.
 
 ## Hotkeys

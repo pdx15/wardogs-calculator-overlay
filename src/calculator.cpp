@@ -95,10 +95,10 @@ const Weapon* findWeapon(const char* id) {
 // =====================================================================
 
 static const MapDef g_maps[] = {
-    // id           name         dataWorld     xMin     xMax    yMin      yMax
-    { "bakurani",  "Bakurani",  "kavkazi",  -16320,      0, -20400,   -4080 },
-    { "ozeti",     "Ozeti",     nullptr,         0,      0,      0,       0 },
-    { "zestafona", "Zestafona", nullptr,         0,      0,      0,       0 }
+    // id           name         dataWorld        xMin       xMax      yMin       yMax
+    { "bakurani",  "Bakurani",  "kavkazi",      -16320,        0,    -20400,     -4080 },
+    { "ozeti",     "Ozeti",     "europe",       -16160,      160,    -16160,       160 },
+    { "zestafona", "Zestafona", "north-america", -8192,     8192,     -8192,      8192 }
 };
 
 const MapDef& mapBakurani()  { return g_maps[0]; }
