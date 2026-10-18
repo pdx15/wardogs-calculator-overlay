@@ -10,6 +10,7 @@ Displays MIL, azimuth, and distance with full terrain height correction.
 - **Field calibration** — Bakurani high-arc profile
 - **Terrain height correction** — loads 16-bit PNG heightmaps from [wardogs-data](https://github.com/warpuppies/wardogs-data)
 - **Always-on-top overlay** — F10 hide, F11 click-through, F12 reset
+- **System tray icon** — left-click toggles overlay, right-click for menu
 
 ## Build
 
@@ -54,10 +55,7 @@ The calculator loads 16-bit PNG heightmaps from the
 
 ### Download
 
-Download the latest release zip from GitHub:
-<https://github.com/warpuppies/wardogs-data/releases>
-
-Extract to any local directory (e.g. `~/wardogs-data/`).
+Download the latest release zip from the wardogs-data GitHub repository and extract to any local directory (e.g. `~/wardogs-data/`).
 
 ### Directory structure
 
@@ -84,3 +82,5 @@ Terrain auto-reloads when you switch maps.
 | F10 | Show / hide overlay |
 | F11 | Toggle click-through |
 | F12 | Reset (show + focus) |
+| Tray icon left-click | Toggle show / hide |
+| Tray icon right-click | Context menu (Show/Hide, Exit) |

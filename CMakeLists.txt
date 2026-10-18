@@ -53,6 +53,11 @@ target_include_directories(calculator PRIVATE
 
 target_link_libraries(calculator PRIVATE SDL2::SDL2)
 
+# Windows: link shell32 for tray icon, gdi32 for icon handling
+if(WIN32)
+    target_link_libraries(calculator PRIVATE shell32 gdi32)
+endif()
+
 # Windows subsystem (hides console window in Release)
 if(WIN32)
     set_target_properties(calculator PROPERTIES

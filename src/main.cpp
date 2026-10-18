@@ -8,16 +8,120 @@
 #include "imgui_impl_sdlrenderer2.h"
 
 #include <SDL.h>
+#include <SDL_syswm.h>
 #include <cstdio>
 #include <cstring>
 #include <cmath>
 #include <string>
 
 #include "calculator.h"
+#include "icon_data.h"
 
 // ── Win32 overlay helpers ──────────────────────────────────────────────
 #ifdef _WIN32
 #include <windows.h>
+#include <shellapi.h>
+
+#define WM_TRAYICON   (WM_USER + 1)
+#define ID_TRAY_SHOW  1001
+#define ID_TRAY_EXIT  1002
+
+static NOTIFYICONDATAW g_nid{};
+static HWND  g_hwndTray = nullptr;
+static UINT  g_taskbarRestart = 0;
+static bool* g_visiblePtr = nullptr;
+
+// Forward declaration
+static void trayAdd();
+static void trayRemove();
+
+static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == g_taskbarRestart) {
+        trayAdd(); // Explorer restarted — re-add tray icon
+        return 0;
+    }
+    if (msg == WM_TRAYICON) {
+        if (lp == WM_LBUTTONUP || lp == WM_LBUTTONDBLCLK) {
+            if (g_visiblePtr) *g_visiblePtr = !*g_visiblePtr;
+            return 0;
+        }
+        if (lp == WM_RBUTTONUP) {
+            POINT pt;
+            GetCursorPos(&pt);
+            HMENU menu = CreatePopupMenu();
+            AppendMenuW(menu, MF_STRING, ID_TRAY_SHOW,
+                        g_visiblePtr && *g_visiblePtr ? L"Hide overlay\tF10" : L"Show overlay\tF10");
+            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+            AppendMenuW(menu, MF_STRING, ID_TRAY_EXIT, L"Exit");
+            SetForegroundWindow(hwnd);
+            TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
+            DestroyMenu(menu);
+            PostMessage(hwnd, WM_NULL, 0, 0);
+            return 0;
+        }
+    }
+    if (msg == WM_COMMAND) {
+        if (LOWORD(wp) == ID_TRAY_SHOW && g_visiblePtr) {
+            *g_visiblePtr = !*g_visiblePtr;
+        } else if (LOWORD(wp) == ID_TRAY_EXIT) {
+            PostQuitMessage(0);
+        }
+        return 0;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+// Create hidden window for tray messages
+static void trayCreateWindow() {
+    WNDCLASSEXW wc{};
+    wc.cbSize        = sizeof(wc);
+    wc.lpfnWndProc   = TrayWndProc;
+    wc.hInstance      = GetModuleHandleW(nullptr);
+    wc.lpszClassName  = L"WarDogsTrayClass";
+    RegisterClassExW(&wc);
+
+    g_hwndTray = CreateWindowExW(0, wc.lpszClassName, L"WarDogsTray",
+                                  0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
+                                  wc.hInstance, nullptr);
+    g_taskbarRestart = RegisterWindowMessageW(L"TaskbarCreated");
+}
+
+static void trayAdd() {
+    if (!g_hwndTray) return;
+    g_nid.cbSize           = sizeof(g_nid);
+    g_nid.hWnd             = g_hwndTray;
+    g_nid.uID              = 1;
+    g_nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    g_nid.uCallbackMessage = WM_TRAYICON;
+    // Try loading icon from exe directory, fall back to resource
+    wchar_t exeDir[MAX_PATH]{};
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    // Strip filename → append assets\y.ico
+    wchar_t* lastSlash = wcsrchr(exeDir, L'\\');
+    if (lastSlash) {
+        wcscpy(lastSlash + 1, L"assets\\y.ico");
+        g_nid.hIcon = (HICON)LoadImageW(nullptr, exeDir, IMAGE_ICON,
+                                          16, 16, LR_LOADFROMFILE);
+    }
+    if (!g_nid.hIcon)
+        g_nid.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
+    if (!g_nid.hIcon)
+        g_nid.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    wcscpy(g_nid.szTip, L"WARDOGS Artillery Calculator");
+    Shell_NotifyIconW(NIM_ADD, &g_nid);
+}
+
+static void trayRemove() {
+    if (g_nid.hWnd) {
+        Shell_NotifyIconW(NIM_DELETE, &g_nid);
+        if (g_nid.hIcon) DestroyIcon(g_nid.hIcon);
+        g_nid = {};
+    }
+    if (g_hwndTray) {
+        DestroyWindow(g_hwndTray);
+        g_hwndTray = nullptr;
+    }
+}
 
 static void win32SetAlwaysOnTop(SDL_Window* w) {
     SDL_SysWMinfo info{};
@@ -26,7 +130,6 @@ static void win32SetAlwaysOnTop(SDL_Window* w) {
         HWND hwnd = info.info.win.window;
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        // Transparent click-through when toggled
         LONG ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
         SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
     }
@@ -52,6 +155,9 @@ static void win32RegisterHotkeys(HWND hwnd) {
     RegisterHotKey(hwnd, 3, 0, VK_F12); // reset
 }
 #else
+static void trayCreateWindow() {}
+static void trayAdd() {}
+static void trayRemove() {}
 static void win32SetAlwaysOnTop(SDL_Window*) {}
 static void win32SetClickThrough(SDL_Window*, bool) {}
 #endif
@@ -293,8 +399,23 @@ int main(int, char**) {
         return 1;
     }
 
+    // ── Window icon (embedded RGBA data) ──────────────────────────
+    {
+        SDL_Surface* iconSurf = SDL_CreateRGBSurfaceFrom(
+            (void*)ICON_RGBA, ICON_W, ICON_H, 32, ICON_W * 4,
+            0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+        if (iconSurf) {
+            SDL_SetWindowIcon(window, iconSurf);
+            SDL_FreeSurface(iconSurf);
+        }
+    }
+
     // Platform-specific overlay setup
     win32SetAlwaysOnTop(window);
+
+    // ── System tray icon ──────────────────────────────────────────
+    trayCreateWindow();
+    trayAdd();
 
     // ── ImGui init ──────────────────────────────────────────────────
     IMGUI_CHECKVERSION();
@@ -314,6 +435,7 @@ int main(int, char**) {
 
     // ── Application state ───────────────────────────────────────────
     App app;
+    g_visiblePtr = &app.visible;   // connect tray toggle to visibility
     app.calc.setWeapon(app.weaponId);
     app.calc.setMap(app.mapId);
     app.calc.setOrigin({(double)app.originX, (double)app.originY});
@@ -372,6 +494,7 @@ int main(int, char**) {
     }
 
     // ── Cleanup ─────────────────────────────────────────────────────
+    trayRemove();
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
