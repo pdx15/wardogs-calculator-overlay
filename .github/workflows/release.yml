@@ -1,0 +1,77 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (x.y.z)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+
+      - name: Install SDL2
+        run: vcpkg install sdl2:x64-windows
+
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package
+        run: |
+          mkdir package
+          copy build\calculator.exe package\
+          xcopy assets package\assets\ /E /I /Y
+          copy README.md package\
+          Compress-Archive -Path package\* -DestinationPath "wardogs-calculator-v${{ inputs.version }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wardogs-calculator-v${{ inputs.version }}
+          path: "wardogs-calculator-v${{ inputs.version }}.zip"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wardogs-calculator-v${{ inputs.version }}
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: >
+          gh release create "v${VERSION}"
+          "wardogs-calculator-v${VERSION}.zip"
+          --repo "${{ github.repository }}"
+          --title "v${VERSION}"
+          --notes "WARDOGS Artillery Calculator v${VERSION}"
+          --draft=false
+          --latest

@@ -93,9 +93,8 @@ struct TerrainGrid {
 struct MapDef {
     const char* id;          // e.g. "bakurani"
     const char* name;        // e.g. "Bakurani"
-    const char* dataWorld;   // wardogs-data folder name (e.g. "kavkazi"), nullptr if absent
-    double xMin, xMax;      // map bounds in metres
-    double yMin, yMax;
+    const char* dataWorld;   // wardogs-data folder name (e.g. "kavkazi")
+    // Bounds loaded dynamically from terrain.json by loadFromWardogsData()
 };
 
 // ── SPH-2 hull correction model ────────────────────────────────────────
