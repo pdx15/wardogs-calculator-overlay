@@ -22,29 +22,30 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
-
-      - name: Install SDL2
-        run: vcpkg install sdl2:x64-windows
+      - name: Download SDL2
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-devel-2.28.5-VC.zip" -OutFile SDL2.zip
+          Expand-Archive -Path SDL2.zip -DestinationPath C:\
+          Rename-Item "C:\SDL2-2.28.5" "C:\SDL2"
 
       - name: Configure
         run: >
           cmake -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
+          -DSDL2_DIR=C:/SDL2/cmake
 
       - name: Build
         run: cmake --build build --config Release
 
       - name: Package
+        shell: pwsh
         run: |
           mkdir package
           copy build\calculator.exe package\
           xcopy assets package\assets\ /E /I /Y
           copy README.md package\
+          copy C:\SDL2\lib\x64\SDL2.dll package\
           Compress-Archive -Path package\* -DestinationPath "wardogs-calculator-v${{ inputs.version }}.zip"
 
       - name: Upload artifact
