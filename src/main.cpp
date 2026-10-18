@@ -150,16 +150,60 @@ static void win32SetClickThrough(SDL_Window* w, bool enable) {
 }
 
 static void win32RegisterHotkeys(HWND hwnd) {
-    RegisterHotKey(hwnd, 1, 0, VK_F10); // show/hide
-    RegisterHotKey(hwnd, 2, 0, VK_F11); // click-through
-    RegisterHotKey(hwnd, 3, 0, VK_F12); // reset
+    RegisterHotKey(hwnd, 1, 0, VK_F10);
+    RegisterHotKey(hwnd, 2, 0, VK_F11);
+    RegisterHotKey(hwnd, 3, 0, VK_F12);
 }
+
+static std::string getExeDir() {
+    wchar_t buf[MAX_PATH]{};
+    GetModuleFileNameW(nullptr, buf, MAX_PATH);
+    wchar_t* slash = wcsrchr(buf, L'\\');
+    if (slash) *slash = L'\0';
+    int len = WideCharToMultiByte(CP_UTF8, 0, buf, -1, nullptr, 0, nullptr, nullptr);
+    std::string result(len - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, buf, -1, result.data(), len, nullptr, nullptr);
+    return result;
+}
+
 #else
 static void trayCreateWindow() {}
 static void trayAdd() {}
 static void trayRemove() {}
 static void win32SetAlwaysOnTop(SDL_Window*) {}
 static void win32SetClickThrough(SDL_Window*, bool) {}
+
+#include <unistd.h>
+static std::string getExeDir() {
+    char buf[4096]{};
+    ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (len > 0) {
+        buf[len] = '\0';
+        char* slash = strrchr(buf, '/');
+        if (slash) *slash = '\0';
+        return buf;
+    }
+    return ".";
+}
+#endif
+
+// Auto-detect wardogs-data/ next to exe, in cwd, or one level up
+static std::string findWardogsData() {
+    std::string exeDir = getExeDir();
+
+    std::string paths[] = {
+        exeDir + "/wardogs-data",        // next to exe
+        "wardogs-data",                  // in cwd
+        exeDir + "/../wardogs-data",     // one level up (e.g. exe in build/)
+    };
+
+    for (auto& c : paths) {
+        std::string test = c + "/data/maps/kavkazi/terrain.json";
+        std::ifstream f(test);
+        if (f) return c;
+    }
+    return {};
+}
 #endif
 
 // ── Application state ──────────────────────────────────────────────────
@@ -440,6 +484,15 @@ int main(int, char**) {
     app.calc.setMap(app.mapId);
     app.calc.setOrigin({(double)app.originX, (double)app.originY});
     app.calc.setTarget({(double)app.targetX, (double)app.targetY});
+
+    // Auto-detect wardogs-data/
+    {
+        std::string found = findWardogsData();
+        if (!found.empty()) {
+            std::strncpy(app.dataDir, found.c_str(), sizeof(app.dataDir) - 1);
+            tryLoadTerrain(app);
+        }
+    }
 
     bool running = true;
     while (running) {
