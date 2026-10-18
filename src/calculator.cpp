@@ -95,10 +95,10 @@ const Weapon* findWeapon(const char* id) {
 // =====================================================================
 
 static const MapDef g_maps[] = {
-    // id           name         dataWorld        xMin       xMax      yMin       yMax
-    { "bakurani",  "Bakurani",  "kavkazi",      -16320,        0,    -20400,     -4080 },
-    { "ozeti",     "Ozeti",     "europe",       -16160,      160,    -16160,       160 },
-    { "zestafona", "Zestafona", "north-america", -8192,     8192,     -8192,      8192 }
+    // id           name         dataWorld
+    { "bakurani",  "Bakurani",  "kavkazi"      },
+    { "ozeti",     "Ozeti",     "europe"       },
+    { "zestafona", "Zestafona", "north-america"}
 };
 
 const MapDef& mapBakurani()  { return g_maps[0]; }
@@ -297,13 +297,8 @@ bool Calculator::loadTerrain(const std::string& path) {
     f.read(reinterpret_cast<char*>(m_terrain.heights.data()),
            (size_t)rows * cols * sizeof(float));
 
-    // Set coordinate bounds from current map
-    if (m_map) {
-        m_terrain.xMin = m_map->xMin;
-        m_terrain.xMax = m_map->xMax;
-        m_terrain.yMin = m_map->yMin;
-        m_terrain.yMax = m_map->yMax;
-    }
+    // Legacy: coordinate bounds must be set separately or via loadFromWardogsData
+    // (terrain.json provides bounds for PNG heightmaps)
 
     return f.good();
 }
