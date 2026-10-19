@@ -15,7 +15,6 @@
 #include <string>
 
 #include "calculator.h"
-#include "icon_data.h"
 
 // ── Win32 overlay helpers ──────────────────────────────────────────────
 #ifdef _WIN32
@@ -31,7 +30,6 @@ static HWND  g_hwndTray = nullptr;
 static UINT  g_taskbarRestart = 0;
 static bool* g_visiblePtr = nullptr;
 
-// Forward declaration
 static void trayAdd();
 static void trayRemove();
 
@@ -85,6 +83,19 @@ static void trayCreateWindow() {
     g_taskbarRestart = RegisterWindowMessageW(L"TaskbarCreated");
 }
 
+static std::string getExeDir();
+
+static HICON loadIcoFromExeDir(const wchar_t* icoName) {
+    std::string dir = getExeDir();
+    // Convert to wide
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, dir.c_str(), -1, nullptr, 0);
+    std::wstring wdir(wlen, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, dir.c_str(), -1, wdir.data(), wlen);
+    std::wstring path = wdir + L"\\" + icoName;
+    return (HICON)LoadImageW(nullptr, path.c_str(), IMAGE_ICON, 0, 0,
+                              LR_LOADFROMFILE | LR_DEFAULTSIZE);
+}
+
 static void trayAdd() {
     if (!g_hwndTray) return;
     g_nid.cbSize           = sizeof(g_nid);
@@ -92,18 +103,10 @@ static void trayAdd() {
     g_nid.uID              = 1;
     g_nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAYICON;
-    wchar_t exeDir[MAX_PATH]{};
-    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
-    wchar_t* lastSlash = wcsrchr(exeDir, L'\\');
-    if (lastSlash) {
-        wcscpy(lastSlash + 1, L"assets\\y.ico");
-        g_nid.hIcon = (HICON)LoadImageW(nullptr, exeDir, IMAGE_ICON,
-                                          16, 16, LR_LOADFROMFILE);
-    }
+
+    g_nid.hIcon = loadIcoFromExeDir(L"assets\\y.ico");
     if (!g_nid.hIcon)
-        g_nid.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
-    if (!g_nid.hIcon)
-        g_nid.hIcon = LoadIconW(nullptr, MAKEINTRESOURCEW(32512)); // IDI_APPLICATION
+        g_nid.hIcon = LoadIconW(nullptr, MAKEINTRESOURCEW(32512));
     wcscpy(g_nid.szTip, L"WARDOGS Artillery Calculator");
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 }
@@ -120,7 +123,6 @@ static void trayRemove() {
     }
 }
 
-// SDL3: use window properties to get native HWND
 static HWND getHWND(SDL_Window* w) {
     SDL_PropertiesID props = SDL_GetWindowProperties(w);
     return (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
@@ -140,12 +142,22 @@ static void win32SetClickThrough(SDL_Window* w, bool enable) {
     HWND hwnd = getHWND(w);
     if (hwnd) {
         LONG ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
-        if (enable)
-            ex |= WS_EX_TRANSPARENT;
-        else
-            ex &= ~WS_EX_TRANSPARENT;
+        if (enable) ex |= WS_EX_TRANSPARENT;
+        else        ex &= ~WS_EX_TRANSPARENT;
         SetWindowLongW(hwnd, GWL_EXSTYLE, ex);
     }
+}
+
+// Set window icon from .ico file (uses Win32 API, works for taskbar + alt-tab)
+static void win32SetWindowIcon(SDL_Window* w) {
+    HICON hIcon = loadIcoFromExeDir(L"assets\\y.ico");
+    if (!hIcon) return;
+    HWND hwnd = getHWND(w);
+    if (hwnd) {
+        SendMessage(hwnd, WM_SETICON, ICON_BIG,   (LPARAM)hIcon);
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+    }
+    // Don't destroy — Windows keeps a reference
 }
 
 static std::string getExeDir() {
@@ -165,6 +177,7 @@ static void trayAdd() {}
 static void trayRemove() {}
 static void win32SetAlwaysOnTop(SDL_Window*) {}
 static void win32SetClickThrough(SDL_Window*, bool) {}
+static void win32SetWindowIcon(SDL_Window*) {}
 
 #include <unistd.h>
 static std::string getExeDir() {
@@ -202,7 +215,7 @@ static std::string findWardogsData() {
 struct App {
     wd::Calculator calc;
 
-    char  weaponId[16]   = "mortar";
+    int   weaponIdx = 0;     // 0 = mortar, 1 = spg
     char  mapId[16]      = "bakurani";
     float originX = -8000.0f, originY = -12000.0f;
     float targetX = -7500.0f, targetY = -11800.0f;
@@ -211,7 +224,7 @@ struct App {
     bool  useHighArc = true;
     float manualAdj = 0.0f;
 
-    // Terrain (wardogs-data)
+    // Terrain
     bool  terrainLoaded = false;
     char  dataDir[512] = "";
     char  lastMapId[16] = "";
@@ -220,10 +233,14 @@ struct App {
     // Result
     wd::Solution solution;
 
-    // Overlay state
+    // Overlay
     bool clickThrough = false;
     bool visible = true;
 };
+
+static const char* weaponIds[] = { "mortar", "spg" };
+static const char* weaponNames[] = { "L81", "SPH-2" };
+static const char* mapIds[] = { "bakurani", "ozeti", "zestafona" };
 
 static void tryLoadTerrain(App& app) {
     app.terrainLoaded = false;
@@ -238,7 +255,9 @@ static void tryLoadTerrain(App& app) {
             app.terrainLoaded = true;
             std::snprintf(app.statusMsg, sizeof(app.statusMsg), "Terrain loaded OK");
         } else {
-            std::snprintf(app.statusMsg, sizeof(app.statusMsg), "Failed to load terrain");
+            const char* world = app.calc.currentMap()->dataWorld;
+            std::snprintf(app.statusMsg, sizeof(app.statusMsg),
+                "Failed: %s/data/maps/%s/terrain.json", app.dataDir, world);
         }
     } else {
         std::snprintf(app.statusMsg, sizeof(app.statusMsg), "No terrain data for this map");
@@ -247,7 +266,7 @@ static void tryLoadTerrain(App& app) {
 }
 
 static void recalc(App& app) {
-    app.calc.setWeapon(app.weaponId);
+    app.calc.setWeapon(weaponIds[app.weaponIdx]);
     app.calc.setMap(app.mapId);
     app.calc.setOrigin({(double)app.originX, (double)app.originY});
     app.calc.setTarget({(double)app.targetX, (double)app.targetY});
@@ -271,27 +290,33 @@ static void drawCalculator(App& app) {
                  ImGuiWindowFlags_AlwaysAutoResize);
 
     // ── Weapon ──────────────────────────────────────────────────────
-    if (ImGui::BeginCombo("Weapon", app.weaponId)) {
-        if (ImGui::Selectable("mortar", std::strcmp(app.weaponId,"mortar")==0))
-            std::strcpy(app.weaponId, "mortar");
-        if (ImGui::Selectable("spg", std::strcmp(app.weaponId,"spg")==0))
-            std::strcpy(app.weaponId, "spg");
-        ImGui::EndCombo();
-    }
-
-    // ── Map ─────────────────────────────────────────────────────────
-    if (ImGui::BeginCombo("Map", app.mapId)) {
-        const char* maps[] = {"bakurani","ozeti","zestafona"};
-        for (auto m : maps) {
-            if (ImGui::Selectable(m, std::strcmp(app.mapId, m)==0))
-                std::strcpy(app.mapId, m);
+    if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
+        for (int i = 0; i < 2; i++) {
+            if (ImGui::Selectable(weaponNames[i], app.weaponIdx == i))
+                app.weaponIdx = i;
         }
         ImGui::EndCombo();
     }
 
-    // ── Terrain (wardogs-data) ────────────────────────────────────
+    // ── Map ─────────────────────────────────────────────────────────
+    const char* currentMapName = app.mapId;
+    for (int i = 0; i < 3; i++) {
+        if (std::strcmp(app.mapId, mapIds[i]) == 0) {
+            currentMapName = mapIds[i];
+            break;
+        }
+    }
+    if (ImGui::BeginCombo("Map", currentMapName)) {
+        for (int i = 0; i < 3; i++) {
+            if (ImGui::Selectable(mapIds[i], std::strcmp(app.mapId, mapIds[i]) == 0))
+                std::strcpy(app.mapId, mapIds[i]);
+        }
+        ImGui::EndCombo();
+    }
+
+    // ── Terrain ─────────────────────────────────────────────────────
     ImGui::Separator();
-    ImGui::Text("wardogs-data directory:");
+    ImGui::Text("wardogs-data:");
     ImGui::SetNextItemWidth(260);
     if (ImGui::InputText("##ddir", app.dataDir, sizeof(app.dataDir),
                          ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -330,7 +355,7 @@ static void drawCalculator(App& app) {
     }
 
     // ── SPH-2 controls ──────────────────────────────────────────────
-    bool isSph = (std::strcmp(app.weaponId, "spg") == 0);
+    bool isSph = (app.weaponIdx == 1);
     if (isSph) {
         ImGui::Separator();
         ImGui::Text("SPH-2 Platform Correction:");
@@ -359,7 +384,7 @@ static void drawCalculator(App& app) {
     auto& s = app.solution;
 
     ImGui::Text("Distance:  %.0f m  (%.2f km)", s.distanceM, s.distanceM/1000.0);
-    ImGui::Text("Azimuth:   %.1f°", s.azimuthDeg);
+    ImGui::Text("Azimuth:   %.1f deg", s.azimuthDeg);
 
     if (app.terrainLoaded) {
         ImGui::Text("Origin Z:  %.1f m", s.originZ);
@@ -407,7 +432,6 @@ int main(int, char**) {
         return 1;
     }
 
-    // Transparent, borderless, always-on-top window
     SDL_Window* window = SDL_CreateWindow(
         "WARDOGS Calculator Overlay",
         400, 620,
@@ -428,16 +452,8 @@ int main(int, char**) {
     }
     SDL_SetRenderVSync(renderer, 1);
 
-    // ── Window icon (embedded RGBA data) ──────────────────────────
-    {
-        SDL_Surface* iconSurf = SDL_CreateSurfaceFrom(
-            ICON_W, ICON_H, SDL_PIXELFORMAT_ABGR8888,
-            (void*)ICON_RGBA, ICON_W * 4);
-        if (iconSurf) {
-            SDL_SetWindowIcon(window, iconSurf);
-            SDL_DestroySurface(iconSurf);
-        }
-    }
+    // ── Window icon (from .ico file, same as tray) ─────────────────
+    win32SetWindowIcon(window);
 
     // Platform-specific overlay setup
     win32SetAlwaysOnTop(window);
@@ -456,7 +472,6 @@ int main(int, char**) {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 6.0f;
     style.FrameRounding  = 4.0f;
-    style.Colors[ImGuiCol_WindowBg].w = 0.92f;
 
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
@@ -464,7 +479,7 @@ int main(int, char**) {
     // ── Application state ───────────────────────────────────────────
     App app;
     g_visiblePtr = &app.visible;
-    app.calc.setWeapon(app.weaponId);
+    app.calc.setWeapon(weaponIds[app.weaponIdx]);
     app.calc.setMap(app.mapId);
     app.calc.setOrigin({(double)app.originX, (double)app.originY});
     app.calc.setTarget({(double)app.targetX, (double)app.targetY});
@@ -514,22 +529,19 @@ int main(int, char**) {
             continue;
         }
 
-        // ── New frame ───────────────────────────────────────────────
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
         drawCalculator(app);
 
-        // ── Render ──────────────────────────────────────────────────
         ImGui::Render();
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_SetRenderDrawColor(renderer, 32, 32, 38, 255);
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
     }
 
-    // ── Cleanup ─────────────────────────────────────────────────────
     trayRemove();
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
