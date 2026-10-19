@@ -9,7 +9,7 @@ Displays MIL, azimuth, and distance with full terrain height correction.
 - **RK4 terrain correction** — numerical physics solver matching Apollyon
 - **Hull heading correction** — SPH-2 platform model (pitch 5°)
 - **Save/Load targets** — per-map target bookmarks
-- **Always-on-top overlay** — F10 hide, F11 click-through, F12 reset
+- **Always-on-top overlay** — system tray for show/hide and exit
 - **System tray icon** — left-click toggles overlay, right-click for menu
 
 ## Build
@@ -47,12 +47,11 @@ If `wardogs-data` is placed next to `calculator.exe`, terrain loads automaticall
 5. **Load** — select a previously saved target
 6. For SPH-2: enable **Hull heading** and set the vehicle heading for platform correction
 
-## Hotkeys
+## Tray
 
-| Key | Action |
-|-----|--------|
-| F10 | Show / hide overlay |
-| F11 | Toggle click-through |
-| F12 | Reset (show + focus) |
+| Action | Effect |
+|--------|--------|
 | Tray icon left-click | Toggle show / hide |
-| Tray icon right-click | Context menu (Show/Hide, Exit) |
+| Tray icon right-click | Exit |
+
+Drag the window by its title bar to move it.

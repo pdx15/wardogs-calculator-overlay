@@ -22,7 +22,6 @@
 #include <shellapi.h>
 
 #define WM_TRAYICON   (WM_USER + 1)
-#define ID_TRAY_SHOW  1001
 #define ID_TRAY_EXIT  1002
 
 static NOTIFYICONDATAW g_nid{};
@@ -48,9 +47,6 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             POINT pt;
             GetCursorPos(&pt);
             HMENU menu = CreatePopupMenu();
-            AppendMenuW(menu, MF_STRING, ID_TRAY_SHOW,
-                        g_visiblePtr && *g_visiblePtr ? L"Hide overlay\tF10" : L"Show overlay\tF10");
-            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
             AppendMenuW(menu, MF_STRING, ID_TRAY_EXIT, L"Exit");
             SetForegroundWindow(hwnd);
             TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
@@ -60,9 +56,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
     }
     if (msg == WM_COMMAND) {
-        if (LOWORD(wp) == ID_TRAY_SHOW && g_visiblePtr) {
-            *g_visiblePtr = !*g_visiblePtr;
-        } else if (LOWORD(wp) == ID_TRAY_EXIT) {
+        if (LOWORD(wp) == ID_TRAY_EXIT) {
             PostQuitMessage(0);
         }
         return 0;
@@ -258,7 +252,6 @@ struct App {
     bool dirty = true;  // recalculate on first frame
 
     // Overlay
-    bool clickThrough = false;
     bool visible = true;
 };
 
@@ -750,26 +743,6 @@ int main(int, char**) {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
                 && event.button.button == SDL_BUTTON_LEFT) {
                 dragging = false;
-            }
-
-            if (event.type == SDL_EVENT_KEY_DOWN) {
-                SDL_Keycode key = event.key.key;
-                if (key == SDLK_F10) {
-                    app.visible = !app.visible;
-                    if (app.visible) SDL_ShowWindow(window);
-                    else             SDL_HideWindow(window);
-                }
-                if (key == SDLK_F11) {
-                    app.clickThrough = !app.clickThrough;
-                    win32SetClickThrough(window, app.clickThrough);
-                }
-                if (key == SDLK_F12) {
-                    app.clickThrough = false;
-                    app.visible = true;
-                    win32SetClickThrough(window, false);
-                    SDL_ShowWindow(window);
-                    SDL_RaiseWindow(window);
-                }
             }
         }
 
