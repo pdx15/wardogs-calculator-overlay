@@ -1,7 +1,29 @@
-# WARDOGS Artillery Calculator — Overlay
+[![GitHub Release](https://img.shields.io/github/release/pdx15/wardogs-calculator-overlay)](https://github.com/pdx15/wardogs-calculator-overlay/releases)
+[![Github All Releases](https://img.shields.io/github/downloads/pdx15/wardogs-calculator-overlay/total.svg)](https://github.com/pdx15/wardogs-calculator-overlay/releases)
+[![ViewCount](https://views.whatilearened.today/views/github/pdx15/wardogs-calculator-overlay.svg)](https://github.com/pdx15/wardogs-calculator-overlay)
+[![Donations Page](https://github.com/andry81-cache/gh-content-static-cache/raw/master/common/badges/donate/donate.svg)](https://github.com/pdx15/wardogs-calculator-overlay#%D0%B4%D0%BE%D0%BD%D0%B0%D1%82donate)
+
+# WARDOGS Artillery Calculator - Overlay
 
 Lightweight C++ desktop overlay for WARDOGS artillery calculations.
 Displays MIL, azimuth, and distance with full terrain height correction.
+
+### Interface Preview
+
+<table>
+  <tr>
+    <th width="72%">In game</th>
+    <th width="28%">UI</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="assets/prev.png">
+    </td>
+    <td align="center">
+      <img src="assets/ui.png">
+    </td>
+  </tr>
+</table>
 
 ## Features
 
@@ -55,3 +77,19 @@ If `wardogs-data` is placed next to `calculator.exe`, terrain loads automaticall
 | Tray icon right-click | Exit |
 
 Drag the window by its title bar to move it.
+
+## Донат/Donate
+
+Если вы хотите оставить чаевые, то можно это сделать по ссылке ниже или через QR-код:
+
+[![Поддержать через CloudTips](assets/qrCode.png)](https://pay.cloudtips.ru/p/1569852d)
+
+**Оставить чаевые через CloudTips:** https://pay.cloudtips.ru/p/1569852d
+
+| Crypto Currency | Network | Wallet ID |
+|--------------|------|----------------|
+| **USDT**     | TRC20 | `TGm951N5TpuBKayeAP6vL8wAdB9vEvdMyo` |
+| **USDT**     | ERC20 | `0xd938130bce0C9A6a8F83dDe4fEAF6A86847c148B` |
+| **BTC**      |    | `c1qhg00wd03fnhdpwhg8fa4a3tpshhmsf0uslw8nf` |
+
+---
