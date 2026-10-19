@@ -116,6 +116,10 @@ endif()
 if(MSVC)
     target_link_options(calculator PRIVATE $<$<CONFIG:Release>:/ENTRY:mainCRTStartup>)
 endif()
+# MinGW: static link to avoid libgcc/libstdc++ DLLs
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(calculator PRIVATE -static)
+endif()
 
 # ── Install ────────────────────────────────────────────────────────
 install(TARGETS calculator RUNTIME DESTINATION bin)

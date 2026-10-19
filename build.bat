@@ -196,9 +196,9 @@ if errorlevel 1 (
 )
 
 echo  [2/3] Configuring (SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "Visual Studio 17 2022" -A x64 2>nul
+cmake -B !BUILD_DIR! -G "Visual Studio 17 2022" -A x64 --fresh 2>nul
 if errorlevel 1 (
-    cmake -B !BUILD_DIR! -G "Visual Studio 16 2019" -A x64
+    cmake -B !BUILD_DIR! -G "Visual Studio 16 2019" -A x64 --fresh
 )
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
@@ -226,7 +226,7 @@ if exist "C:\mingw64\bin\g++.exe"          set "PATH=C:\mingw64\bin;!PATH!"
 if exist "C:\mingw\bin\g++.exe"            set "PATH=C:\mingw\bin;!PATH!"
 
 echo  [1/3] Configuring (MinGW-w64, SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG!
+cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG! --fresh
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
@@ -254,7 +254,7 @@ if exist "C:\MinGW\bin\g++.exe"            set "PATH=C:\MinGW\bin;!PATH!"
 
 set "BUILD_DIR=build32"
 echo  [1/3] Configuring (MinGW32, SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG!
+cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG! --fresh
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
