@@ -85,22 +85,25 @@ static void trayCreateWindow() {
 
 static std::string getExeDir();
 
-static HICON loadIcoFromExeDir(const wchar_t* icoName) {
+static HICON loadAppIcon() {
+    // Try embedded resource first (icon ID = 1, from icon.rc)
+    HICON h = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
+    if (h) return h;
+
+    // Fallback: search for file near exe
     std::string dir = getExeDir();
-    // Convert to wide
     int wlen = MultiByteToWideChar(CP_UTF8, 0, dir.c_str(), -1, nullptr, 0);
     std::wstring wdir(wlen, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, dir.c_str(), -1, wdir.data(), wlen);
 
-    // Search: exe dir, parent, grandparent (handles build/Release/ structure)
     std::wstring candidates[] = {
-        wdir + L"\\" + icoName,
-        wdir + L"\\..\\" + icoName,
-        wdir + L"\\..\\..\\" + icoName,
+        wdir + L"\\assets\\y.ico",
+        wdir + L"\\..\\assets\\y.ico",
+        wdir + L"\\..\\..\\assets\\y.ico",
     };
     for (auto& path : candidates) {
-        HICON h = (HICON)LoadImageW(nullptr, path.c_str(), IMAGE_ICON, 0, 0,
-                                     LR_LOADFROMFILE | LR_DEFAULTSIZE);
+        h = (HICON)LoadImageW(nullptr, path.c_str(), IMAGE_ICON, 0, 0,
+                               LR_LOADFROMFILE | LR_DEFAULTSIZE);
         if (h) return h;
     }
     return nullptr;
@@ -114,7 +117,7 @@ static void trayAdd() {
     g_nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAYICON;
 
-    g_nid.hIcon = loadIcoFromExeDir(L"assets\\y.ico");
+    g_nid.hIcon = loadAppIcon();
     if (!g_nid.hIcon)
         g_nid.hIcon = LoadIconW(nullptr, MAKEINTRESOURCEW(32512));
     wcscpy(g_nid.szTip, L"WARDOGS Artillery Calculator");
@@ -158,9 +161,9 @@ static void win32SetClickThrough(SDL_Window* w, bool enable) {
     }
 }
 
-// Set window icon from .ico file (uses Win32 API, works for taskbar + alt-tab)
+// Set window icon (embedded resource or file)
 static void win32SetWindowIcon(SDL_Window* w) {
-    HICON hIcon = loadIcoFromExeDir(L"assets\\y.ico");
+    HICON hIcon = loadAppIcon();
     if (!hIcon) return;
     HWND hwnd = getHWND(w);
     if (hwnd) {
@@ -296,7 +299,7 @@ static void drawCalculator(App& app) {
     ImGui::SetNextWindowSize({380, 0}, ImGuiCond_FirstUseEver);
 
     ImGui::Begin("WARDOGS Artillery Calculator", nullptr,
-                 ImGuiWindowFlags_AlwaysAutoResize);
+                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
 
     // ── Weapon ──────────────────────────────────────────────────────
     if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
@@ -442,9 +445,17 @@ int main(int, char**) {
 
     SDL_Window* window = SDL_CreateWindow(
         "WARDOGS Calculator Overlay",
-        400, 620,
+        440, 700,
         SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TRANSPARENT
     );
+    if (!window) {
+        // Fallback: try without transparent (some drivers don't support it)
+        window = SDL_CreateWindow(
+            "WARDOGS Calculator Overlay",
+            440, 700,
+            SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS
+        );
+    }
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
@@ -503,6 +514,11 @@ int main(int, char**) {
         }
     }
 
+    // Window dragging state (drag the borderless SDL window manually)
+    bool dragging = false;
+    float dragStartX = 0, dragStartY = 0;
+    int winStartX = 0, winStartY = 0;
+
     bool running = true;
     while (running) {
         SDL_Event event;
@@ -511,6 +527,25 @@ int main(int, char**) {
 
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
+            }
+
+            // Window dragging: any mouse press+move drags the borderless window
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
+                && event.button.button == SDL_BUTTON_LEFT
+                && !ImGui::GetIO().WantCaptureMouse) {
+                dragging = true;
+                dragStartX = (float)event.button.x;
+                dragStartY = (float)event.button.y;
+                SDL_GetWindowPosition(window, &winStartX, &winStartY);
+            }
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
+                && event.button.button == SDL_BUTTON_LEFT) {
+                dragging = false;
+            }
+            if (event.type == SDL_EVENT_MOUSE_MOTION && dragging) {
+                int dx = (int)(event.motion.x - dragStartX);
+                int dy = (int)(event.motion.y - dragStartY);
+                SDL_SetWindowPosition(window, winStartX + dx, winStartY + dy);
             }
 
             if (event.type == SDL_EVENT_KEY_DOWN) {
