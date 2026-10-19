@@ -319,17 +319,43 @@ static void loadSavedTargets(App& app) {
 }
 
 static void saveTarget(App& app, const char* name) {
-    // Append to file
     std::ofstream f(getSavePath(), std::ios::app);
     if (!f) return;
     f << app.mapId << ":" << name << ":" << app.targetX << ":" << app.targetY << "\n";
-    // Reload to refresh list
+    f.close();  // flush before reload
     loadSavedTargets(app);
 }
 
-static void loadTargetFileAll(App& app) {
-    // Load all targets from file for the current map
+static void deleteSavedTarget(App& app, int idx) {
+    if (idx < 0 || idx >= (int)app.savedTargets.size()) return;
+    // Rewrite file without the deleted entry
+    std::string path = getSavePath();
+    // Read all entries from file (all maps)
+    std::vector<std::string> lines;
+    {
+        std::ifstream f(path);
+        std::string line;
+        while (std::getline(f, line)) {
+            // Parse map and name to find the one to delete
+            auto p1 = line.find(':');
+            if (p1 == std::string::npos) { lines.push_back(line); continue; }
+            auto p2 = line.find(':', p1 + 1);
+            if (p2 == std::string::npos) { lines.push_back(line); continue; }
+            std::string map = line.substr(0, p1);
+            std::string name = line.substr(p1 + 1, p2 - p1 - 1);
+            // Skip the entry that matches current map + selected name
+            if (map == app.mapId && name == app.savedTargets[idx].name)
+                continue;
+            lines.push_back(line);
+        }
+    }
+    {
+        std::ofstream f(path);
+        for (auto& l : lines) f << l << "\n";
+    }
     loadSavedTargets(app);
+    if (app.loadIdx >= (int)app.savedTargets.size())
+        app.loadIdx = std::max(0, (int)app.savedTargets.size() - 1);
 }
 
 static void recalc(App& app) {
@@ -472,6 +498,22 @@ static void drawCalculator(App& app) {
             }
             ImGui::EndCombo();
         }
+    }
+    ImGui::SameLine();
+    // Del button — red, deletes selected saved target
+    {
+        ImVec4 red(0.8f, 0.2f, 0.2f, 1.0f);
+        ImVec4 redHover(1.0f, 0.3f, 0.3f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, red);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, redHover);
+        bool canDel = !app.savedTargets.empty()
+                   && app.loadIdx < (int)app.savedTargets.size();
+        if (!canDel) ImGui::BeginDisabled();
+        if (ImGui::Button("Del")) {
+            deleteSavedTarget(app, app.loadIdx);
+        }
+        if (!canDel) ImGui::EndDisabled();
+        ImGui::PopStyleColor(2);
     }
 
     // Save Target popup
@@ -637,8 +679,7 @@ int main(int, char**) {
 
     // Window dragging state
     bool dragging = false;
-    int dragStartX = 0, dragStartY = 0;
-    int winStartX = 0, winStartY = 0;
+    int dragOffX = 0, dragOffY = 0;  // offset from mouse to window top-left
 
     bool running = true;
     while (running) {
@@ -650,24 +691,20 @@ int main(int, char**) {
                 running = false;
             }
 
-            // Window dragging: title bar click moves the borderless SDL window
-            // g_titleBarHover is set each frame by drawCalculator()
+            // Start drag: record offset from mouse to window origin
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
                 && event.button.button == SDL_BUTTON_LEFT
                 && g_titleBarHover) {
                 dragging = true;
-                dragStartX = event.button.x;
-                dragStartY = event.button.y;
-                SDL_GetWindowPosition(window, &winStartX, &winStartY);
+                int mx, my, wx, wy;
+                SDL_GetGlobalMouseState(&mx, &my);
+                SDL_GetWindowPosition(window, &wx, &wy);
+                dragOffX = mx - wx;
+                dragOffY = my - wy;
             }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
                 && event.button.button == SDL_BUTTON_LEFT) {
                 dragging = false;
-            }
-            if (event.type == SDL_EVENT_MOUSE_MOTION && dragging) {
-                int dx = event.motion.x - dragStartX;
-                int dy = event.motion.y - dragStartY;
-                SDL_SetWindowPosition(window, winStartX + dx, winStartY + dy);
             }
 
             if (event.type == SDL_EVENT_KEY_DOWN) {
@@ -694,6 +731,13 @@ int main(int, char**) {
         if (!app.visible) {
             SDL_Delay(50);
             continue;
+        }
+
+        // Smooth drag: update window position every frame from global mouse
+        if (dragging) {
+            int mx, my;
+            SDL_GetGlobalMouseState(&mx, &my);
+            SDL_SetWindowPosition(window, mx - dragOffX, my - dragOffY);
         }
 
         ImGui_ImplSDLRenderer3_NewFrame();
