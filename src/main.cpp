@@ -30,6 +30,7 @@ static UINT  g_taskbarRestart = 0;
 static bool* g_visiblePtr = nullptr;
 static bool  g_titleBarHover = false;
 static bool  g_exitRequested = false;
+static int*  g_hotkeyVkPtr = nullptr;  // points to app.hotkeyVk
 
 static void trayAdd();
 static void trayRemove();
@@ -60,6 +61,10 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (LOWORD(wp) == ID_TRAY_EXIT) {
             g_exitRequested = true;
         }
+        return 0;
+    }
+    if (msg == WM_HOTKEY) {
+        if (g_visiblePtr) *g_visiblePtr = !*g_visiblePtr;
         return 0;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);
@@ -129,6 +134,41 @@ static void trayRemove() {
     if (g_hwndTray) {
         DestroyWindow(g_hwndTray);
         g_hwndTray = nullptr;
+    }
+}
+
+static void registerHotkey(int vk) {
+    if (!g_hwndTray) return;
+    UnregisterHotKey(g_hwndTray, 1);
+    if (vk > 0) RegisterHotKey(g_hwndTray, 1, 0, vk);
+}
+
+// Convert VK code to display name
+static const char* vkToName(int vk) {
+    if (vk == 0) return "None";
+    if (vk >= VK_F1 && vk <= VK_F24) {
+        static char buf[8];
+        std::snprintf(buf, sizeof(buf), "F%d", vk - VK_F1 + 1);
+        return buf;
+    }
+    if (vk >= '0' && vk <= '9') { static char c[2]; c[0]=(char)vk; c[1]=0; return c; }
+    if (vk >= 'A' && vk <= 'Z') { static char c[2]; c[0]=(char)vk; c[1]=0; return c; }
+    switch (vk) {
+        case VK_OEM_3: return "~";
+        case VK_OEM_MINUS: return "-";
+        case VK_OEM_PLUS: return "=";
+        case VK_OEM_4: return "[";
+        case VK_OEM_6: return "]";
+        case VK_OEM_1: return ";";
+        case VK_OEM_7: return "'";
+        case VK_OEM_5: return "\\";
+        case VK_OEM_COMMA: return ",";
+        case VK_OEM_PERIOD: return ".";
+        case VK_OEM_2: return "/";
+        case VK_SPACE: return "Space";
+        case VK_TAB: return "Tab";
+        case VK_ESCAPE: return "Esc";
+        default: return "?";
     }
 }
 
@@ -245,7 +285,7 @@ struct App {
 
     // Saved targets
     std::vector<SavedTarget> savedTargets;
-    int   loadIdx = 0;
+    int   loadIdx = -1;  // -1 = nothing selected
     char  saveName[64] = "";
 
     // Result
@@ -254,6 +294,12 @@ struct App {
 
     // Overlay
     bool visible = true;
+    bool settingsOpen = true;  // collapsible: weapon/map/terrain block
+
+    // Global hotkey (Win32 virtual key code, default F5=0x74)
+    int hotkeyVk = 0x74;  // VK_F5
+    bool hotkeyRegistered = false;
+    bool waitingForKey = false;
 };
 
 static const char* weaponIds[] = { "mortar", "spg" };
@@ -371,8 +417,11 @@ static void deleteSavedTarget(App& app, int idx) {
         for (auto& l : lines) f << l << "\n";
     }
     loadSavedTargets(app);
-    if (app.loadIdx >= (int)app.savedTargets.size())
-        app.loadIdx = std::max(0, (int)app.savedTargets.size() - 1);
+    if (app.savedTargets.empty()) {
+        app.loadIdx = -1;
+    } else if (app.loadIdx >= (int)app.savedTargets.size()) {
+        app.loadIdx = (int)app.savedTargets.size() - 1;
+    }
 }
 
 static void recalc(App& app) {
@@ -387,7 +436,7 @@ static void recalc(App& app) {
     if (std::strcmp(app.mapId, app.lastMapId) != 0) {
         tryLoadTerrain(app);
         loadSavedTargets(app);
-        app.loadIdx = 0;
+        app.loadIdx = -1;
     }
 
     app.solution = app.calc.solve();
@@ -414,57 +463,79 @@ static void drawCalculator(App& app) {
     // Track if any input changed this frame
     bool changed = false;
 
-    // ── Weapon ──────────────────────────────────────────────────────
-    if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
-        for (int i = 0; i < 2; i++) {
-            if (ImGui::Selectable(weaponNames[i], app.weaponIdx == i)) {
-                app.weaponIdx = i;
-                changed = true;
-            }
-        }
-        ImGui::EndCombo();
-    }
+    // ── Settings (collapsible) ──────────────────────────────────────
+    if (ImGui::CollapsingHeader("Settings",
+            app.settingsOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+        app.settingsOpen = true;
 
-    // ── Map ─────────────────────────────────────────────────────────
-    const char* currentMapName = app.mapId;
-    for (int i = 0; i < 3; i++) {
-        if (std::strcmp(app.mapId, mapIds[i]) == 0) {
-            currentMapName = mapIds[i];
-            break;
+        // Weapon
+        if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
+            for (int i = 0; i < 2; i++) {
+                if (ImGui::Selectable(weaponNames[i], app.weaponIdx == i)) {
+                    app.weaponIdx = i;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
         }
-    }
-    if (ImGui::BeginCombo("Map", currentMapName)) {
+
+        // Map
+        const char* currentMapName = app.mapId;
         for (int i = 0; i < 3; i++) {
-            if (ImGui::Selectable(mapIds[i], std::strcmp(app.mapId, mapIds[i]) == 0)) {
-                std::strcpy(app.mapId, mapIds[i]);
-                changed = true;
+            if (std::strcmp(app.mapId, mapIds[i]) == 0) {
+                currentMapName = mapIds[i];
+                break;
             }
         }
-        ImGui::EndCombo();
-    }
+        if (ImGui::BeginCombo("Map", currentMapName)) {
+            for (int i = 0; i < 3; i++) {
+                if (ImGui::Selectable(mapIds[i], std::strcmp(app.mapId, mapIds[i]) == 0)) {
+                    std::strcpy(app.mapId, mapIds[i]);
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
 
-    // ── Terrain ─────────────────────────────────────────────────────
-    if (app.terrainLoaded) {
-        ImGui::Separator();
-        ImGui::TextColored({0.3f,1,0.3f,1}, "Terrain: OK");
-        ImGui::SameLine();
-        if (ImGui::SmallButton("change")) {
-            app.terrainLoaded = false;
+        // Terrain + Hotkey
+        if (app.terrainLoaded) {
+            ImGui::TextColored({0.3f,1,0.3f,1}, "Terrain: OK");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("change")) {
+                app.terrainLoaded = false;
+            }
+            ImGui::SameLine();
+            // Hotkey button
+            {
+                const char* label = app.waitingForKey
+                    ? "[Press a key...]"
+                    : (app.hotkeyVk > 0
+                        ? (std::string("Hotkey: ") + vkToName(app.hotkeyVk)).c_str()
+                        : "Hotkey: None");
+                if (ImGui::SmallButton(label)) {
+                    app.waitingForKey = !app.waitingForKey;
+                }
+                if (app.waitingForKey) {
+                    ImGui::SameLine();
+                    ImGui::TextColored({1,1,0,1}, "(Esc=off)");
+                }
+            }
+        } else {
+            ImGui::Text("wardogs-data:");
+            ImGui::SetNextItemWidth(260);
+            if (ImGui::InputText("##ddir", app.dataDir, sizeof(app.dataDir),
+                                 ImGuiInputTextFlags_EnterReturnsTrue)) {
+                tryLoadTerrain(app);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Load")) {
+                tryLoadTerrain(app);
+            }
+            if (app.statusMsg[0])
+                ImGui::TextWrapped("%s", app.statusMsg);
         }
     } else {
-        ImGui::Separator();
-        ImGui::Text("wardogs-data:");
-        ImGui::SetNextItemWidth(260);
-        if (ImGui::InputText("##ddir", app.dataDir, sizeof(app.dataDir),
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
-            tryLoadTerrain(app);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Load")) {
-            tryLoadTerrain(app);
-        }
-        if (app.statusMsg[0])
-            ImGui::TextWrapped("%s", app.statusMsg);
+        app.settingsOpen = false;
     }
 
     // ── Coordinates ─────────────────────────────────────────────────
@@ -503,7 +574,7 @@ static void drawCalculator(App& app) {
     {
         const char* preview = app.savedTargets.empty()
             ? "(no saved targets)"
-            : (app.loadIdx < (int)app.savedTargets.size()
+            : (app.loadIdx >= 0 && app.loadIdx < (int)app.savedTargets.size()
                 ? app.savedTargets[app.loadIdx].name : "(select)");
         ImGui::SetNextItemWidth(160);
         if (ImGui::BeginCombo("##load", preview)) {
@@ -526,6 +597,7 @@ static void drawCalculator(App& app) {
         ImGui::PushStyleColor(ImGuiCol_Button, red);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, redHover);
         bool canDel = !app.savedTargets.empty()
+                   && app.loadIdx >= 0
                    && app.loadIdx < (int)app.savedTargets.size();
         if (!canDel) ImGui::BeginDisabled();
         if (ImGui::Button("Del")) {
@@ -700,6 +772,8 @@ int main(int, char**) {
     // ── Application state ───────────────────────────────────────────
     App app;
     g_visiblePtr = &app.visible;
+    g_hotkeyVkPtr = &app.hotkeyVk;
+    registerHotkey(app.hotkeyVk);
     app.calc.setWeapon(weaponIds[app.weaponIdx]);
     app.calc.setMap(app.mapId);
     app.calc.setOrigin({(double)app.originX, (double)app.originY});
@@ -728,6 +802,21 @@ int main(int, char**) {
 
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
+            }
+
+            // Hotkey reassignment: capture next keypress
+            if (app.waitingForKey && event.type == SDL_EVENT_KEY_DOWN) {
+                int vk = event.key.key;
+                // Map SDL keycodes to Win32 VK codes for common keys
+                if (vk >= SDLK_F1 && vk <= SDLK_F24) app.hotkeyVk = VK_F1 + (vk - SDLK_F1);
+                else if (vk >= SDLK_0 && vk <= SDLK_9) app.hotkeyVk = '0' + (vk - SDLK_0);
+                else if (vk >= SDLK_A && vk <= SDLK_Z) app.hotkeyVk = 'A' + (vk - SDLK_A);
+                else if (vk == SDLK_GRAVE) app.hotkeyVk = VK_OEM_3;
+                else if (vk == SDLK_ESCAPE) app.hotkeyVk = 0;  // Esc = disable hotkey
+                else app.hotkeyVk = 0;
+                registerHotkey(app.hotkeyVk);
+                app.waitingForKey = false;
+                continue;  // don't process this key as game input
             }
 
             // Start drag: record offset from mouse to window origin
