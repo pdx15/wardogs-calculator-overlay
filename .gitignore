@@ -8,6 +8,8 @@ out/
 build/
 build32/
 build-*/
+SDL3/
+SDL3-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake

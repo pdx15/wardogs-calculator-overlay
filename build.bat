@@ -48,6 +48,7 @@ set "VCVARSALL="
 
 REM Visual Studio
 for %%V in (
+    "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat"
     "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
     "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat"
     "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
@@ -76,6 +77,14 @@ if not errorlevel 1 (
 REM MSYS2
 if exist "C:\msys64\mingw64\bin\g++.exe" set "HAS_MINGW64=1"
 if exist "C:\msys64\mingw32\bin\g++.exe" set "HAS_MINGW32=1"
+
+REM Standalone MinGW
+if exist "C:\mingw64\mingw64\bin\g++.exe" set "HAS_MINGW64=1"
+if exist "C:\mingw64\bin\g++.exe"         set "HAS_MINGW64=1"
+if exist "C:\mingw32\mingw32\bin\g++.exe" set "HAS_MINGW32=1"
+if exist "C:\mingw32\bin\g++.exe"         set "HAS_MINGW32=1"
+if exist "C:\mingw\bin\g++.exe"           set "HAS_MINGW64=1"
+if exist "C:\MinGW\bin\g++.exe"           set "HAS_MINGW32=1"
 
 REM -- If compiler already set via args, skip menu -------------------
 if not "%COMPILER%"=="" goto :compiler_done
@@ -161,9 +170,11 @@ echo  ============================================================
 REM -- Auto-detect SDL3 ---------------------------------------------
 if not "!SDL3_DIR!"=="" goto :sdl3_found
 
-REM Search paths
+REM Search paths (SDL3 zip extracts as SDL3-x.y.z/ inside the target dir)
 for %%P in (
+    "%CD%\SDL3\SDL3-%SDL3_VERSION%"
     "%CD%\SDL3"
+    "C:\SDL3\SDL3-%SDL3_VERSION%"
     "C:\SDL3"
     "C:\SDL3-%SDL3_VERSION%"
 ) do (
@@ -222,8 +233,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo  Extracting to C:\SDL3-%SDL3_VERSION%...
-powershell -Command "Expand-Archive -Path '!SDL3_ZIP!' -DestinationPath 'C:\' -Force"
+echo  Extracting to SDL3\...
+if not exist "SDL3" mkdir SDL3
+powershell -Command "Expand-Archive -Path '!SDL3_ZIP!' -DestinationPath 'SDL3' -Force"
 if errorlevel 1 (
     echo.
     echo  [ERROR] Extraction failed.
@@ -231,7 +243,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "SDL3_DIR=C:\SDL3-%SDL3_VERSION%"
+set "SDL3_DIR=%CD%\SDL3"
 echo  Done: !SDL3_DIR!
 goto :sdl3_found
 
@@ -315,6 +327,11 @@ goto :done
 REM ---------------------------------------------------------------
 :build_mingw64
 REM ---------------------------------------------------------------
+REM Ensure MinGW is in PATH
+if exist "C:\msys64\mingw64\bin\g++.exe"   set "PATH=C:\msys64\mingw64\bin;%PATH%"
+if exist "C:\mingw64\mingw64\bin\g++.exe"  set "PATH=C:\mingw64\mingw64\bin;%PATH%"
+if exist "C:\mingw64\bin\g++.exe"          set "PATH=C:\mingw64\bin;%PATH%"
+if exist "C:\mingw\bin\g++.exe"            set "PATH=C:\mingw\bin;%PATH%"
 echo  [1/3] Configuring (MinGW-w64)...
 cmake -B %BUILD_DIR% -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=%CONFIG% -DSDL3_DIR="!SDL3_CMAKE!"
 if errorlevel 1 (
@@ -340,6 +357,11 @@ goto :done
 REM ---------------------------------------------------------------
 :build_mingw32
 REM ---------------------------------------------------------------
+REM Ensure MinGW is in PATH
+if exist "C:\msys64\mingw32\bin\g++.exe"   set "PATH=C:\msys64\mingw32\bin;%PATH%"
+if exist "C:\mingw32\mingw32\bin\g++.exe"  set "PATH=C:\mingw32\mingw32\bin;%PATH%"
+if exist "C:\mingw32\bin\g++.exe"          set "PATH=C:\mingw32\bin;%PATH%"
+if exist "C:\MinGW\bin\g++.exe"            set "PATH=C:\MinGW\bin;%PATH%"
 set "BUILD_DIR=build32"
 echo  [1/3] Configuring (MinGW32)...
 cmake -B %BUILD_DIR% -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=%CONFIG% -DSDL3_DIR="!SDL3_CMAKE!"
