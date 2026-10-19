@@ -3,6 +3,8 @@
 [![ViewCount](https://views.whatilearened.today/views/github/pdx15/wardogs-calculator-overlay.svg)](https://github.com/pdx15/wardogs-calculator-overlay)
 [![Donations Page](https://github.com/andry81-cache/gh-content-static-cache/raw/master/common/badges/donate/donate.svg)](https://github.com/pdx15/wardogs-calculator-overlay#%D0%B4%D0%BE%D0%BD%D0%B0%D1%82donate)
 
+**English** | [Русский](README_RU.md)
+
 # WARDOGS Artillery Calculator - Overlay
 
 Lightweight C++ desktop overlay for WARDOGS artillery calculations.
