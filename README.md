@@ -8,6 +8,8 @@
 Lightweight C++ desktop overlay for WARDOGS artillery calculations.
 Displays MIL, azimuth, and distance with full terrain height correction.
 
+Download for windows [Releases](https://github.com/pdx15/wardogs-calculator-overlay/releases)
+
 ### Interface Preview
 
 <table>
@@ -53,6 +55,8 @@ wardogs-data/
     ├── europe/heightmap.png
     └── north-america/heightmap.png
 ```
+
+Download [wardogs-data](https://drive.google.com/file/d/1vN_mXTHkiWVPnv3evhWjevvLWi_dmDWB/view?usp=sharing)
 
 Without `wardogs-data` the calculator still works — MIL is computed from ballistic tables, but without terrain height correction (Delta Z = 0).
 
