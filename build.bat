@@ -48,6 +48,7 @@ set "VCVARSALL="
 
 REM Visual Studio
 for %%V in (
+    "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat"
     "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
     "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat"
     "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
@@ -161,9 +162,11 @@ echo  ============================================================
 REM -- Auto-detect SDL3 ---------------------------------------------
 if not "!SDL3_DIR!"=="" goto :sdl3_found
 
-REM Search paths
+REM Search paths (SDL3 zip extracts as SDL3-x.y.z/ inside the target dir)
 for %%P in (
+    "%CD%\SDL3\SDL3-%SDL3_VERSION%"
     "%CD%\SDL3"
+    "C:\SDL3\SDL3-%SDL3_VERSION%"
     "C:\SDL3"
     "C:\SDL3-%SDL3_VERSION%"
 ) do (
@@ -222,8 +225,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo  Extracting to C:\SDL3-%SDL3_VERSION%...
-powershell -Command "Expand-Archive -Path '!SDL3_ZIP!' -DestinationPath 'C:\' -Force"
+echo  Extracting to SDL3\...
+if not exist "SDL3" mkdir SDL3
+powershell -Command "Expand-Archive -Path '!SDL3_ZIP!' -DestinationPath 'SDL3' -Force"
 if errorlevel 1 (
     echo.
     echo  [ERROR] Extraction failed.
@@ -231,7 +235,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "SDL3_DIR=C:\SDL3-%SDL3_VERSION%"
+set "SDL3_DIR=%CD%\SDL3"
 echo  Done: !SDL3_DIR!
 goto :sdl3_found
 
