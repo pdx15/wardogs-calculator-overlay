@@ -29,6 +29,7 @@ static HWND  g_hwndTray = nullptr;
 static UINT  g_taskbarRestart = 0;
 static bool* g_visiblePtr = nullptr;
 static bool  g_titleBarHover = false;
+static bool  g_exitRequested = false;
 
 static void trayAdd();
 static void trayRemove();
@@ -57,7 +58,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     if (msg == WM_COMMAND) {
         if (LOWORD(wp) == ID_TRAY_EXIT) {
-            PostQuitMessage(0);
+            g_exitRequested = true;
         }
         return 0;
     }
@@ -720,6 +721,7 @@ int main(int, char**) {
 
     bool running = true;
     while (running) {
+        if (g_exitRequested) running = false;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL3_ProcessEvent(&event);
