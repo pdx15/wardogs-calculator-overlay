@@ -111,6 +111,8 @@ if(WIN32)
     set_target_properties(calculator PROPERTIES
         WIN32_EXECUTABLE $<CONFIG:Release>
     )
+    # Use main() entry point with /subsystem:windows
+    target_link_options(calculator PRIVATE $<$<CONFIG:Release>:/ENTRY:mainCRTStartup>)
 endif()
 
 # ── Install ────────────────────────────────────────────────────────
