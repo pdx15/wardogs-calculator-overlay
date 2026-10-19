@@ -1,14 +1,14 @@
 /* =====================================================================
-   main.cpp  —  WARDOGS Artillery Calculator  (C++ / ImGui / SDL2)
+   main.cpp  —  WARDOGS Artillery Calculator  (C++ / ImGui / SDL3)
    ===================================================================== */
 
-// ── ImGui + SDL2 + OpenGL3 backends ────────────────────────────────────
+// ── ImGui + SDL3 backends ───────────────────────────────────────────
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlrenderer3.h"
 
-#include <SDL.h>
-#include <SDL_syswm.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_properties.h>
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -37,7 +37,7 @@ static void trayRemove();
 
 static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == g_taskbarRestart) {
-        trayAdd(); // Explorer restarted — re-add tray icon
+        trayAdd();
         return 0;
     }
     if (msg == WM_TRAYICON) {
@@ -71,7 +71,6 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-// Create hidden window for tray messages
 static void trayCreateWindow() {
     WNDCLASSEXW wc{};
     wc.cbSize        = sizeof(wc);
@@ -93,10 +92,8 @@ static void trayAdd() {
     g_nid.uID              = 1;
     g_nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAYICON;
-    // Try loading icon from exe directory, fall back to resource
     wchar_t exeDir[MAX_PATH]{};
     GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
-    // Strip filename → append assets\y.ico
     wchar_t* lastSlash = wcsrchr(exeDir, L'\\');
     if (lastSlash) {
         wcscpy(lastSlash + 1, L"assets\\y.ico");
@@ -123,11 +120,15 @@ static void trayRemove() {
     }
 }
 
+// SDL3: use window properties to get native HWND
+static HWND getHWND(SDL_Window* w) {
+    SDL_PropertiesID props = SDL_GetWindowProperties(w);
+    return (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+}
+
 static void win32SetAlwaysOnTop(SDL_Window* w) {
-    SDL_SysWMinfo info{};
-    SDL_VERSION(&info.version);
-    if (SDL_GetWindowWMInfo(w, &info)) {
-        HWND hwnd = info.info.win.window;
+    HWND hwnd = getHWND(w);
+    if (hwnd) {
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         LONG ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
@@ -136,10 +137,8 @@ static void win32SetAlwaysOnTop(SDL_Window* w) {
 }
 
 static void win32SetClickThrough(SDL_Window* w, bool enable) {
-    SDL_SysWMinfo info{};
-    SDL_VERSION(&info.version);
-    if (SDL_GetWindowWMInfo(w, &info)) {
-        HWND hwnd = info.info.win.window;
+    HWND hwnd = getHWND(w);
+    if (hwnd) {
         LONG ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
         if (enable)
             ex |= WS_EX_TRANSPARENT;
@@ -147,12 +146,6 @@ static void win32SetClickThrough(SDL_Window* w, bool enable) {
             ex &= ~WS_EX_TRANSPARENT;
         SetWindowLongW(hwnd, GWL_EXSTYLE, ex);
     }
-}
-
-static void win32RegisterHotkeys(HWND hwnd) {
-    RegisterHotKey(hwnd, 1, 0, VK_F10);
-    RegisterHotKey(hwnd, 2, 0, VK_F11);
-    RegisterHotKey(hwnd, 3, 0, VK_F12);
 }
 
 static std::string getExeDir() {
@@ -192,9 +185,9 @@ static std::string findWardogsData() {
     std::string exeDir = getExeDir();
 
     std::string paths[] = {
-        exeDir + "/wardogs-data",        // next to exe
-        "wardogs-data",                  // in cwd
-        exeDir + "/../wardogs-data",     // one level up (e.g. exe in build/)
+        exeDir + "/wardogs-data",
+        "wardogs-data",
+        exeDir + "/../wardogs-data",
     };
 
     for (auto& c : paths) {
@@ -204,13 +197,11 @@ static std::string findWardogsData() {
     }
     return {};
 }
-#endif
 
 // ── Application state ──────────────────────────────────────────────────
 struct App {
     wd::Calculator calc;
 
-    // Current input strings (for ImGui input fields)
     char  weaponId[16]   = "mortar";
     char  mapId[16]      = "bakurani";
     float originX = -8000.0f, originY = -12000.0f;
@@ -223,7 +214,7 @@ struct App {
     // Terrain (wardogs-data)
     bool  terrainLoaded = false;
     char  dataDir[512] = "";
-    char  lastMapId[16] = "";      // track map changes for auto-reload
+    char  lastMapId[16] = "";
     char  statusMsg[256] = "";
 
     // Result
@@ -264,7 +255,6 @@ static void recalc(App& app) {
     app.calc.setUseHighArc(app.useHighArc);
     app.calc.setManualMilAdj((double)app.manualAdj);
 
-    // Auto-reload terrain if map changed
     if (std::strcmp(app.mapId, app.lastMapId) != 0) {
         tryLoadTerrain(app);
     }
@@ -382,14 +372,13 @@ static void drawCalculator(App& app) {
     if (!s.inRange) {
         ImGui::TextColored({1,0.4f,0.4f,1}, "OUT OF RANGE");
     } else {
-        // Determine displayed MIL
         double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
         bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
 
         if (!hasSol) {
             ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
         } else {
-            ImGui::PushFont(nullptr); // uses default; could use a large font
+            ImGui::PushFont(nullptr);
             ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
             ImGui::PopFont();
         }
@@ -413,7 +402,7 @@ static void drawCalculator(App& app) {
 // ── Main ───────────────────────────────────────────────────────────────
 
 int main(int, char**) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
@@ -421,10 +410,8 @@ int main(int, char**) {
     // Transparent, borderless, always-on-top window
     SDL_Window* window = SDL_CreateWindow(
         "WARDOGS Calculator Overlay",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         400, 620,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
-          | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_SKIP_TASKBAR
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALWAYS_ON_TOP
     );
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -432,25 +419,23 @@ int main(int, char**) {
         return 1;
     }
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(
-        window, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-    );
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
     if (!renderer) {
         std::fprintf(stderr, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
+    SDL_SetRenderVSync(renderer, 1);
 
     // ── Window icon (embedded RGBA data) ──────────────────────────
     {
-        SDL_Surface* iconSurf = SDL_CreateRGBSurfaceFrom(
-            (void*)ICON_RGBA, ICON_W, ICON_H, 32, ICON_W * 4,
-            0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+        SDL_Surface* iconSurf = SDL_CreateSurfaceFrom(
+            ICON_W, ICON_H, SDL_PIXELFORMAT_ABGR8888,
+            (void*)ICON_RGBA, ICON_W * 4);
         if (iconSurf) {
             SDL_SetWindowIcon(window, iconSurf);
-            SDL_FreeSurface(iconSurf);
+            SDL_DestroySurface(iconSurf);
         }
     }
 
@@ -467,19 +452,18 @@ int main(int, char**) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Dark theme with transparency
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 6.0f;
     style.FrameRounding  = 4.0f;
     style.Colors[ImGuiCol_WindowBg].w = 0.92f;
 
-    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer2_Init(renderer);
+    ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer3_Init(renderer);
 
     // ── Application state ───────────────────────────────────────────
     App app;
-    g_visiblePtr = &app.visible;   // connect tray toggle to visibility
+    g_visiblePtr = &app.visible;
     app.calc.setWeapon(app.weaponId);
     app.calc.setMap(app.mapId);
     app.calc.setOrigin({(double)app.originX, (double)app.originY});
@@ -498,15 +482,14 @@ int main(int, char**) {
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
+            ImGui_ImplSDL3_ProcessEvent(&event);
 
-            if (event.type == SDL_QUIT) {
+            if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
 
-            // Global hotkeys (F10/F11/F12) via SDL
-            if (event.type == SDL_KEYDOWN) {
-                SDL_Keycode key = event.key.keysym.sym;
+            if (event.type == SDL_EVENT_KEY_DOWN) {
+                SDL_Keycode key = event.key.key;
                 if (key == SDLK_F10) {
                     app.visible = !app.visible;
                     if (app.visible) SDL_ShowWindow(window);
@@ -532,8 +515,8 @@ int main(int, char**) {
         }
 
         // ── New frame ───────────────────────────────────────────────
-        ImGui_ImplSDLRenderer2_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
         drawCalculator(app);
@@ -542,14 +525,14 @@ int main(int, char**) {
         ImGui::Render();
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
     }
 
     // ── Cleanup ─────────────────────────────────────────────────────
     trayRemove();
-    ImGui_ImplSDLRenderer2_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
