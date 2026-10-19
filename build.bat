@@ -196,13 +196,9 @@ if errorlevel 1 (
 )
 
 echo  [2/3] Configuring (SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "Visual Studio 18 2026" -A x64 --fresh 2>nul
-if errorlevel 1 (
-    cmake -B !BUILD_DIR! -G "Visual Studio 17 2022" -A x64 --fresh 2>nul
-)
-if errorlevel 1 (
-    cmake -B !BUILD_DIR! -G "Visual Studio 16 2019" -A x64 --fresh
-)
+if exist "!BUILD_DIR!\CMakeCache.txt" del /q "!BUILD_DIR!\CMakeCache.txt"
+if exist "!BUILD_DIR!\CMakeFiles" rd /s /q "!BUILD_DIR!\CMakeFiles"
+cmake -B !BUILD_DIR! -G Ninja -DCMAKE_BUILD_TYPE=!CONFIG!
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
@@ -217,7 +213,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "OUTPUT=!BUILD_DIR!\!CONFIG!\calculator.exe"
+set "OUTPUT=!BUILD_DIR!\calculator.exe"
 goto :done
 
 REM ---------------------------------------------------------------
@@ -229,7 +225,9 @@ if exist "C:\mingw64\bin\g++.exe"          set "PATH=C:\mingw64\bin;!PATH!"
 if exist "C:\mingw\bin\g++.exe"            set "PATH=C:\mingw\bin;!PATH!"
 
 echo  [1/3] Configuring (MinGW-w64, SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG! --fresh
+if exist "!BUILD_DIR!\CMakeCache.txt" del /q "!BUILD_DIR!\CMakeCache.txt"
+if exist "!BUILD_DIR!\CMakeFiles" rd /s /q "!BUILD_DIR!\CMakeFiles"
+cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG!
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
@@ -257,7 +255,9 @@ if exist "C:\MinGW\bin\g++.exe"            set "PATH=C:\MinGW\bin;!PATH!"
 
 set "BUILD_DIR=build32"
 echo  [1/3] Configuring (MinGW32, SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG! --fresh
+if exist "!BUILD_DIR!\CMakeCache.txt" del /q "!BUILD_DIR!\CMakeCache.txt"
+if exist "!BUILD_DIR!\CMakeFiles" rd /s /q "!BUILD_DIR!\CMakeFiles"
+cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG!
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
