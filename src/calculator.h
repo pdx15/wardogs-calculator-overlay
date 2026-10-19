@@ -63,12 +63,12 @@ struct TerrainGrid {
     bool loaded() const { return rows > 0 && cols > 0
                                   && heights.size() == (size_t)rows * cols; }
 
-    double heightAt(double gameX, double gameY) const {
+    double heightAt(double metresX, double metresY) const {
         if (!loaded()) return 0.0;
 
-        // Map game coords → grid indices (fractional)
-        double gx = (gameX - xMin) / (xMax - xMin) * (cols - 1);
-        double gy = (gameY - yMin) / (yMax - yMin) * (rows - 1);
+        // Map metre coords → grid indices (fractional)
+        double gx = (metresX - xMin) / (xMax - xMin) * (cols - 1);
+        double gy = (metresY - yMin) / (yMax - yMin) * (rows - 1);
 
         int x0 = std::clamp((int)gx, 0, cols - 2);
         int y0 = std::clamp((int)gy, 0, rows - 2);
