@@ -804,21 +804,6 @@ int main(int, char**) {
                 running = false;
             }
 
-            // Hotkey reassignment: capture next keypress
-            if (app.waitingForKey && event.type == SDL_EVENT_KEY_DOWN) {
-                int vk = event.key.key;
-                // Map SDL keycodes to Win32 VK codes for common keys
-                if (vk >= SDLK_F1 && vk <= SDLK_F24) app.hotkeyVk = VK_F1 + (vk - SDLK_F1);
-                else if (vk >= SDLK_0 && vk <= SDLK_9) app.hotkeyVk = '0' + (vk - SDLK_0);
-                else if (vk >= SDLK_A && vk <= SDLK_Z) app.hotkeyVk = 'A' + (vk - SDLK_A);
-                else if (vk == SDLK_GRAVE) app.hotkeyVk = VK_OEM_3;
-                else if (vk == SDLK_ESCAPE) app.hotkeyVk = 0;  // Esc = disable hotkey
-                else app.hotkeyVk = 0;
-                registerHotkey(app.hotkeyVk);
-                app.waitingForKey = false;
-                continue;  // don't process this key as game input
-            }
-
             // Start drag: record offset from mouse to window origin
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
                 && event.button.button == SDL_BUTTON_LEFT
@@ -854,6 +839,26 @@ int main(int, char**) {
         ImGui::NewFrame();
 
         drawCalculator(app);
+
+        // Hotkey reassignment: capture key via ImGui after frame
+        if (app.waitingForKey) {
+            for (int k = ImGuiKey_NamedKey_BEGIN; k < ImGuiKey_NamedKey_END; k++) {
+                if (ImGui::IsKeyPressed((ImGuiKey)k)) {
+                    int vk = 0;
+                    if (k >= ImGuiKey_F1 && k <= ImGuiKey_F24) vk = VK_F1 + (k - ImGuiKey_F1);
+                    else if (k >= ImGuiKey_0 && k <= ImGuiKey_9) vk = '0' + (k - ImGuiKey_0);
+                    else if (k >= ImGuiKey_A && k <= ImGuiKey_Z) vk = 'A' + (k - ImGuiKey_A);
+                    else if (k == ImGuiKey_GraveAccent) vk = VK_OEM_3;
+                    else if (k == ImGuiKey_Escape) vk = 0;
+                    if (vk != 0 || k == ImGuiKey_Escape) {
+                        app.hotkeyVk = vk;
+                        registerHotkey(app.hotkeyVk);
+                        app.waitingForKey = false;
+                    }
+                    break;
+                }
+            }
+        }
 
         ImGui::Render();
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
