@@ -22,7 +22,6 @@
 #include <shellapi.h>
 
 #define WM_TRAYICON   (WM_USER + 1)
-#define ID_TRAY_SHOW  1001
 #define ID_TRAY_EXIT  1002
 
 static NOTIFYICONDATAW g_nid{};
@@ -48,9 +47,6 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             POINT pt;
             GetCursorPos(&pt);
             HMENU menu = CreatePopupMenu();
-            AppendMenuW(menu, MF_STRING, ID_TRAY_SHOW,
-                        g_visiblePtr && *g_visiblePtr ? L"Hide overlay\tF10" : L"Show overlay\tF10");
-            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
             AppendMenuW(menu, MF_STRING, ID_TRAY_EXIT, L"Exit");
             SetForegroundWindow(hwnd);
             TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
@@ -60,9 +56,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
     }
     if (msg == WM_COMMAND) {
-        if (LOWORD(wp) == ID_TRAY_SHOW && g_visiblePtr) {
-            *g_visiblePtr = !*g_visiblePtr;
-        } else if (LOWORD(wp) == ID_TRAY_EXIT) {
+        if (LOWORD(wp) == ID_TRAY_EXIT) {
             PostQuitMessage(0);
         }
         return 0;
@@ -258,7 +252,6 @@ struct App {
     bool dirty = true;  // recalculate on first frame
 
     // Overlay
-    bool clickThrough = false;
     bool visible = true;
 };
 
@@ -300,6 +293,8 @@ static void loadSavedTargets(App& app) {
     if (!f) return;
     std::string line;
     while (std::getline(f, line)) {
+        // Skip empty lines
+        if (line.empty()) continue;
         // Format: mapId:name:x:y
         auto p1 = line.find(':');
         if (p1 == std::string::npos) continue;
@@ -319,11 +314,32 @@ static void loadSavedTargets(App& app) {
 }
 
 static void saveTarget(App& app, const char* name) {
+    // Ensure file ends with newline before appending
+    {
+        std::ifstream in(getSavePath(), std::ios::ate | std::ios::binary);
+        if (in.tellg() > 0) {
+            in.seekg(-1, std::ios::end);
+            char last = 0;
+            in.get(last);
+            if (last != '\n') {
+                in.close();
+                std::ofstream out(getSavePath(), std::ios::app | std::ios::binary);
+                out << "\n";
+            }
+        }
+    }
     std::ofstream f(getSavePath(), std::ios::app);
     if (!f) return;
     f << app.mapId << ":" << name << ":" << app.targetX << ":" << app.targetY << "\n";
-    f.close();  // flush before reload
+    f.close();
     loadSavedTargets(app);
+    // Select the newly saved target
+    for (int i = 0; i < (int)app.savedTargets.size(); i++) {
+        if (std::strcmp(app.savedTargets[i].name, name) == 0) {
+            app.loadIdx = i;
+            break;
+        }
+    }
 }
 
 static void deleteSavedTarget(App& app, int idx) {
@@ -452,21 +468,23 @@ static void drawCalculator(App& app) {
 
     // ── Coordinates ─────────────────────────────────────────────────
     ImGui::Separator();
-    ImGui::Text("Artillery position (m):");
-    ImGui::SetNextItemWidth(140);
+    ImGui::Text("Origin:");
+    ImGui::SameLine(70);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(140);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
 
-    ImGui::Text("Target position (m):");
-    ImGui::SetNextItemWidth(140);
+    ImGui::Text("Target:");
+    ImGui::SameLine(70);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(140);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
 
@@ -524,7 +542,6 @@ static void drawCalculator(App& app) {
                                        ImGuiInputTextFlags_EnterReturnsTrue);
         if ((ImGui::Button("Save") || enter) && app.saveName[0]) {
             saveTarget(app, app.saveName);
-            app.loadIdx = (int)app.savedTargets.size() - 1;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -538,20 +555,21 @@ static void drawCalculator(App& app) {
     bool isSph = (app.weaponIdx == 1);
     if (isSph) {
         ImGui::Separator();
-        ImGui::Text("SPH-2 Platform Correction:");
-
+        ImGui::Text("Platform:");
+        ImGui::SameLine(70);
         ImGui::Checkbox("Hull heading", &app.hullEnabled);
         changed |= ImGui::IsItemEdited();
         if (app.hullEnabled) {
-            ImGui::SetNextItemWidth(120);
-            ImGui::InputFloat("Heading (deg)", &app.hullDeg, 0, 0, "%.1f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputFloat("deg##hd", &app.hullDeg, 0, 0, "%.1f");
             changed |= ImGui::IsItemEdited();
             if (app.hullDeg < 0)   app.hullDeg += 360;
             if (app.hullDeg >=360) app.hullDeg -= 360;
         }
 
         ImGui::Text("Trajectory:");
-        ImGui::SameLine();
+        ImGui::SameLine(70);
         if (ImGui::RadioButton("Low", !app.useHighArc)) { app.useHighArc = false; changed = true; }
         ImGui::SameLine();
         if (ImGui::RadioButton("High", app.useHighArc))  { app.useHighArc = true;  changed = true; }
@@ -725,26 +743,6 @@ int main(int, char**) {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
                 && event.button.button == SDL_BUTTON_LEFT) {
                 dragging = false;
-            }
-
-            if (event.type == SDL_EVENT_KEY_DOWN) {
-                SDL_Keycode key = event.key.key;
-                if (key == SDLK_F10) {
-                    app.visible = !app.visible;
-                    if (app.visible) SDL_ShowWindow(window);
-                    else             SDL_HideWindow(window);
-                }
-                if (key == SDLK_F11) {
-                    app.clickThrough = !app.clickThrough;
-                    win32SetClickThrough(window, app.clickThrough);
-                }
-                if (key == SDLK_F12) {
-                    app.clickThrough = false;
-                    app.visible = true;
-                    win32SetClickThrough(window, false);
-                    SDL_ShowWindow(window);
-                    SDL_RaiseWindow(window);
-                }
             }
         }
 
