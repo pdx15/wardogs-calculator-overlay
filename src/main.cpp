@@ -227,8 +227,8 @@ struct App {
 
     int   weaponIdx = 0;     // 0 = mortar, 1 = spg
     char  mapId[16]      = "bakurani";
-    float originX = 66.89f, originY = 87.25f;
-    float targetX = 80.20f, targetY = 72.06f;
+    float originX = 0.0f, originY = 0.0f;
+    float targetX = 0.0f, targetY = 0.0f;
     float hullDeg = 0.0f;
     bool  hullEnabled = false;
     bool  useHighArc = true;
@@ -398,38 +398,35 @@ static void drawCalculator(App& app) {
     ImGui::Text("Azimuth:   %.1f deg", s.azimuthDeg);
 
     if (app.terrainLoaded) {
-        ImGui::Text("Origin Z:  %.1f m", s.originZ);
-        ImGui::Text("Target Z:  %.1f m", s.targetZ);
         ImGui::Text("Delta Z:   %+.1f m", s.deltaZ);
     }
 
     ImGui::Separator();
 
+    // MIL display
+    double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
+    bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
+
     if (!s.inRange) {
         ImGui::TextColored({1,0.4f,0.4f,1}, "OUT OF RANGE");
+    } else if (!hasSol) {
+        ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
     } else {
-        double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
-        bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
+        ImGui::PushFont(nullptr);
+        ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
+        ImGui::PopFont();
+    }
 
-        if (!hasSol) {
-            ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
-        } else {
-            ImGui::PushFont(nullptr);
-            ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
-            ImGui::PopFont();
-        }
+    if (isSph && s.hasLow && s.hasHigh) {
+        ImGui::Text("Low:   %.0f MIL", std::round(s.finalLowMil));
+        ImGui::Text("High:  %.0f MIL", std::round(s.finalHighMil));
+    }
 
-        if (isSph && s.hasLow && s.hasHigh) {
-            ImGui::Text("Low:   %.0f MIL", std::round(s.finalLowMil));
-            ImGui::Text("High:  %.0f MIL", std::round(s.finalHighMil));
-        }
-
-        if (isSph && app.hullEnabled) {
-            double corr = s.useHighArc
-                ? s.hullCorrectionHighMil : s.hullCorrectionLowMil;
-            if (std::abs(corr) > 0.05)
-                ImGui::Text("Hull correction: %+.1f MIL", corr);
-        }
+    if (isSph && app.hullEnabled) {
+        double corr = s.useHighArc
+            ? s.hullCorrectionHighMil : s.hullCorrectionLowMil;
+        if (std::abs(corr) > 0.05)
+            ImGui::Text("Hull correction: %+.1f MIL", corr);
     }
 
     ImGui::End();
