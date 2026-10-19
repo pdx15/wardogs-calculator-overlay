@@ -91,9 +91,19 @@ static HICON loadIcoFromExeDir(const wchar_t* icoName) {
     int wlen = MultiByteToWideChar(CP_UTF8, 0, dir.c_str(), -1, nullptr, 0);
     std::wstring wdir(wlen, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, dir.c_str(), -1, wdir.data(), wlen);
-    std::wstring path = wdir + L"\\" + icoName;
-    return (HICON)LoadImageW(nullptr, path.c_str(), IMAGE_ICON, 0, 0,
-                              LR_LOADFROMFILE | LR_DEFAULTSIZE);
+
+    // Search: exe dir, parent, grandparent (handles build/Release/ structure)
+    std::wstring candidates[] = {
+        wdir + L"\\" + icoName,
+        wdir + L"\\..\\" + icoName,
+        wdir + L"\\..\\..\\" + icoName,
+    };
+    for (auto& path : candidates) {
+        HICON h = (HICON)LoadImageW(nullptr, path.c_str(), IMAGE_ICON, 0, 0,
+                                     LR_LOADFROMFILE | LR_DEFAULTSIZE);
+        if (h) return h;
+    }
+    return nullptr;
 }
 
 static void trayAdd() {
@@ -217,8 +227,8 @@ struct App {
 
     int   weaponIdx = 0;     // 0 = mortar, 1 = spg
     char  mapId[16]      = "bakurani";
-    float originX = -8000.0f, originY = -12000.0f;
-    float targetX = -7500.0f, targetY = -11800.0f;
+    float originX = 0.0f, originY = 0.0f;
+    float targetX = 0.0f, targetY = 0.0f;
     float hullDeg = 0.0f;
     bool  hullEnabled = false;
     bool  useHighArc = true;
@@ -388,38 +398,35 @@ static void drawCalculator(App& app) {
     ImGui::Text("Azimuth:   %.1f deg", s.azimuthDeg);
 
     if (app.terrainLoaded) {
-        ImGui::Text("Origin Z:  %.1f m", s.originZ);
-        ImGui::Text("Target Z:  %.1f m", s.targetZ);
         ImGui::Text("Delta Z:   %+.1f m", s.deltaZ);
     }
 
     ImGui::Separator();
 
+    // MIL display
+    double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
+    bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
+
     if (!s.inRange) {
         ImGui::TextColored({1,0.4f,0.4f,1}, "OUT OF RANGE");
+    } else if (!hasSol) {
+        ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
     } else {
-        double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
-        bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
+        ImGui::PushFont(nullptr);
+        ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
+        ImGui::PopFont();
+    }
 
-        if (!hasSol) {
-            ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
-        } else {
-            ImGui::PushFont(nullptr);
-            ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
-            ImGui::PopFont();
-        }
+    if (isSph && s.hasLow && s.hasHigh) {
+        ImGui::Text("Low:   %.0f MIL", std::round(s.finalLowMil));
+        ImGui::Text("High:  %.0f MIL", std::round(s.finalHighMil));
+    }
 
-        if (isSph && s.hasLow && s.hasHigh) {
-            ImGui::Text("Low:   %.0f MIL", std::round(s.finalLowMil));
-            ImGui::Text("High:  %.0f MIL", std::round(s.finalHighMil));
-        }
-
-        if (isSph && app.hullEnabled) {
-            double corr = s.useHighArc
-                ? s.hullCorrectionHighMil : s.hullCorrectionLowMil;
-            if (std::abs(corr) > 0.05)
-                ImGui::Text("Hull correction: %+.1f MIL", corr);
-        }
+    if (isSph && app.hullEnabled) {
+        double corr = s.useHighArc
+            ? s.hullCorrectionHighMil : s.hullCorrectionLowMil;
+        if (std::abs(corr) > 0.05)
+            ImGui::Text("Hull correction: %+.1f MIL", corr);
     }
 
     ImGui::End();
@@ -436,7 +443,7 @@ int main(int, char**) {
     SDL_Window* window = SDL_CreateWindow(
         "WARDOGS Calculator Overlay",
         400, 620,
-        SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALWAYS_ON_TOP
+        SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS
     );
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -537,7 +544,7 @@ int main(int, char**) {
         drawCalculator(app);
 
         ImGui::Render();
-        SDL_SetRenderDrawColor(renderer, 32, 32, 38, 255);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);

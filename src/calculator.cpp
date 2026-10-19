@@ -304,7 +304,12 @@ bool Calculator::loadTerrain(const std::string& path) {
 }
 
 double Calculator::terrainHeightAt(Vec2 p) const {
-    return m_terrain.heightAt(p.x, p.y);
+    if (!m_terrain.loaded()) return 0.0;
+    // Convert game coordinates to metres:
+    // game coord 0 = terrain metres min, 1 unit = METRES_PER_UNIT metres
+    double mx = p.x * METRES_PER_UNIT + m_terrain.xMin;
+    double my = p.y * METRES_PER_UNIT + m_terrain.yMin;
+    return m_terrain.heightAt(mx, my);
 }
 
 // =====================================================================
@@ -435,6 +440,9 @@ bool Calculator::loadFromWardogsData(const std::string& dataDir) {
     // ── 3. Decode pixel values → heights and store ─────────────────
     //
     //  encoding:  z = zMin + pixel_value / 65535 * (zMax - zMin)
+    //
+    //  Terrain grid stored in METRES. Game coords are converted
+    //  to metres in terrainHeightAt() before lookup.
     //
     m_terrain.rows = h;
     m_terrain.cols = w;
