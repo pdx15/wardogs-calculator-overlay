@@ -341,17 +341,17 @@ static void drawCalculator(App& app) {
     ImGui::Separator();
     ImGui::Text("Artillery position (m):");
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.1f");
+    ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.2f");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.1f");
+    ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.2f");
 
     ImGui::Text("Target position (m):");
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.1f");
+    ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.2f");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.1f");
+    ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.2f");
 
     if (ImGui::Button("Swap")) {
         std::swap(app.originX, app.targetX);
