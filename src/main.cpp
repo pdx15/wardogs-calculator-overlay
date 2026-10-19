@@ -649,6 +649,25 @@ int main(int, char**) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    // Font with Cyrillic support
+    const char* fontPaths[] = {
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\verdana.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    };
+    bool fontLoaded = false;
+    for (auto& path : fontPaths) {
+        ImFont* f = io.Fonts->AddFontFromFileTTF(path, 16.0f, nullptr,
+                                                  io.Fonts->GetGlyphRangesCyrillic());
+        if (f) { fontLoaded = true; break; }
+    }
+    if (!fontLoaded) {
+        // Fallback: default font with Cyrillic (may show boxes)
+        io.Fonts->AddFontDefault();
+    }
+
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 6.0f;
@@ -696,11 +715,12 @@ int main(int, char**) {
                 && event.button.button == SDL_BUTTON_LEFT
                 && g_titleBarHover) {
                 dragging = true;
-                int mx, my, wx, wy;
+                float mx, my;
+                int wx, wy;
                 SDL_GetGlobalMouseState(&mx, &my);
                 SDL_GetWindowPosition(window, &wx, &wy);
-                dragOffX = mx - wx;
-                dragOffY = my - wy;
+                dragOffX = (int)mx - wx;
+                dragOffY = (int)my - wy;
             }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
                 && event.button.button == SDL_BUTTON_LEFT) {
@@ -735,9 +755,9 @@ int main(int, char**) {
 
         // Smooth drag: update window position every frame from global mouse
         if (dragging) {
-            int mx, my;
+            float mx, my;
             SDL_GetGlobalMouseState(&mx, &my);
-            SDL_SetWindowPosition(window, mx - dragOffX, my - dragOffY);
+            SDL_SetWindowPosition(window, (int)mx - dragOffX, (int)my - dragOffY);
         }
 
         ImGui_ImplSDLRenderer3_NewFrame();
