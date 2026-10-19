@@ -507,12 +507,14 @@ static void drawCalculator(App& app) {
             ImGui::SameLine();
             // Hotkey button
             {
-                const char* label = app.waitingForKey
-                    ? "[Press a key...]"
-                    : (app.hotkeyVk > 0
-                        ? (std::string("Hotkey: ") + vkToName(app.hotkeyVk)).c_str()
-                        : "Hotkey: None");
-                if (ImGui::SmallButton(label)) {
+                static std::string hotkeyLabel;
+                if (app.waitingForKey)
+                    hotkeyLabel = "[Press a key...]";
+                else if (app.hotkeyVk > 0)
+                    hotkeyLabel = std::string("Hotkey: ") + vkToName(app.hotkeyVk);
+                else
+                    hotkeyLabel = "Hotkey: None";
+                if (ImGui::SmallButton(hotkeyLabel.c_str())) {
                     app.waitingForKey = !app.waitingForKey;
                 }
                 if (app.waitingForKey) {
