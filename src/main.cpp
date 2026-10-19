@@ -29,6 +29,7 @@ static NOTIFYICONDATAW g_nid{};
 static HWND  g_hwndTray = nullptr;
 static UINT  g_taskbarRestart = 0;
 static bool* g_visiblePtr = nullptr;
+static bool  g_titleBarHover = false;
 
 static void trayAdd();
 static void trayRemove();
@@ -301,6 +302,16 @@ static void drawCalculator(App& app) {
     ImGui::Begin("WARDOGS Artillery Calculator", nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
 
+    // Title bar hover detection for window dragging
+    {
+        ImVec2 wp = ImGui::GetWindowPos();
+        ImVec2 ws = ImGui::GetWindowSize();
+        float  th = ImGui::GetFrameHeight();
+        ImVec2 mp = ImGui::GetIO().MousePos;
+        g_titleBarHover = (mp.x >= wp.x && mp.x <= wp.x + ws.x
+                        && mp.y >= wp.y && mp.y <= wp.y + th);
+    }
+
     // ── Weapon ──────────────────────────────────────────────────────
     if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
         for (int i = 0; i < 2; i++) {
@@ -420,11 +431,6 @@ static void drawCalculator(App& app) {
         ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
     }
 
-    if (isSph && s.hasLow && s.hasHigh) {
-        ImGui::Text("Low:   %.0f MIL", std::round(s.finalLowMil));
-        ImGui::Text("High:  %.0f MIL", std::round(s.finalHighMil));
-    }
-
     if (isSph && app.hullEnabled) {
         double corr = s.useHighArc
             ? s.hullCorrectionHighMil : s.hullCorrectionLowMil;
@@ -514,9 +520,9 @@ int main(int, char**) {
         }
     }
 
-    // Window dragging state (drag the borderless SDL window manually)
+    // Window dragging state
     bool dragging = false;
-    float dragStartX = 0, dragStartY = 0;
+    int dragStartX = 0, dragStartY = 0;
     int winStartX = 0, winStartY = 0;
 
     bool running = true;
@@ -529,13 +535,14 @@ int main(int, char**) {
                 running = false;
             }
 
-            // Window dragging: any mouse press+move drags the borderless window
+            // Window dragging: title bar click moves the borderless SDL window
+            // g_titleBarHover is set each frame by drawCalculator()
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
                 && event.button.button == SDL_BUTTON_LEFT
-                && !ImGui::GetIO().WantCaptureMouse) {
+                && g_titleBarHover) {
                 dragging = true;
-                dragStartX = (float)event.button.x;
-                dragStartY = (float)event.button.y;
+                dragStartX = event.button.x;
+                dragStartY = event.button.y;
                 SDL_GetWindowPosition(window, &winStartX, &winStartY);
             }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
@@ -543,8 +550,8 @@ int main(int, char**) {
                 dragging = false;
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION && dragging) {
-                int dx = (int)(event.motion.x - dragStartX);
-                int dy = (int)(event.motion.y - dragStartY);
+                int dx = event.motion.x - dragStartX;
+                int dy = event.motion.y - dragStartY;
                 SDL_SetWindowPosition(window, winStartX + dx, winStartY + dy);
             }
 
