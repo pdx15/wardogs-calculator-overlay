@@ -443,7 +443,7 @@ int main(int, char**) {
     SDL_Window* window = SDL_CreateWindow(
         "WARDOGS Calculator Overlay",
         400, 620,
-        SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS
+        SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TRANSPARENT
     );
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -480,6 +480,8 @@ int main(int, char**) {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 6.0f;
     style.FrameRounding  = 4.0f;
+    // Fully opaque ImGui window (transparent only outside)
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
 
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);

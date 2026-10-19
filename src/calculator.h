@@ -20,7 +20,8 @@ constexpr double DEG = PI / 180.0;
 
 // ── Map coordinate → metres ────────────────────────────────────────────
 //  Game uses real-meter coordinates (e.g. x ∈ [-16320, 0]).
-constexpr double METRES_PER_UNIT = 1.0;
+//  1 game unit = 100 metres.
+constexpr double METRES_PER_UNIT = 100.0;
 
 // ── 2-D point (game coordinates) ──────────────────────────────────────
 struct Vec2 {
@@ -178,8 +179,8 @@ public:
 private:
     const Weapon* m_weapon = nullptr;
     const MapDef* m_map    = nullptr;
-    Vec2 m_origin{5, 5};
-    Vec2 m_target{5.5, 5.5};
+    Vec2 m_origin{0, 0};
+    Vec2 m_target{0, 0};
     double m_hullDeg = NAN;
     bool   m_highArc = true;
     double m_manualAdj = 0;
