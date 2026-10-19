@@ -3,14 +3,31 @@
 # =====================================================================
 
 cmake_minimum_required(VERSION 3.20)
-project(wardogs-calculator-overlay LANGUAGES CXX)
+project(wardogs-calculator-overlay LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ── Fetch ImGui ─────────────────────────────────────────────────────
+# ── Static runtime on MSVC ────────────────────────────────────────
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+# ── Fetch SDL3 (built from source, static) ────────────────────────
 include(FetchContent)
 
+set(SDL_SHARED OFF  CACHE BOOL "" FORCE)
+set(SDL_STATIC ON   CACHE BOOL "" FORCE)
+set(SDL_TEST   OFF  CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    SDL3
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG        release-3.4.18
+    GIT_SHALLOW    TRUE
+)
+
+# ── Fetch ImGui ────────────────────────────────────────────────────
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
@@ -18,17 +35,9 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
-# ── Find SDL3 ───────────────────────────────────────────────────────
-#  Option 1: vcpkg  →  cmake -DCMAKE_TOOLCHAIN_FILE=...
-#  Option 2: manual →  cmake -DSDL3_DIR=C:/SDL3/cmake
-#  Option 3: system →  apt install libsdl3-dev
+FetchContent_MakeAvailable(SDL3 imgui)
 
-find_package(SDL3 REQUIRED CONFIG)
-
-# ── Fetch ImGui after SDL3 is found ─────────────────────────────────
-FetchContent_MakeAvailable(imgui)
-
-# ── ImGui sources ───────────────────────────────────────────────────
+# ── ImGui sources ──────────────────────────────────────────────────
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
 
 set(IMGUI_SOURCES
@@ -40,7 +49,7 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer3.cpp
 )
 
-# ── Executable ──────────────────────────────────────────────────────
+# ── Executable ─────────────────────────────────────────────────────
 add_executable(calculator
     src/main.cpp
     src/calculator.cpp
@@ -53,19 +62,20 @@ target_include_directories(calculator PRIVATE
     src
 )
 
-target_link_libraries(calculator PRIVATE SDL3::SDL3)
+# Static SDL3 (no DLL needed)
+target_link_libraries(calculator PRIVATE SDL3::SDL3-static)
 
-# Windows: link shell32 for tray icon, gdi32 for icon handling
+# Windows: tray icon, icon loading
 if(WIN32)
-    target_link_libraries(calculator PRIVATE shell32 gdi32)
+    target_link_libraries(calculator PRIVATE shell32 gdi32 ole32 imm32 version winmm setupapi)
 endif()
 
-# Windows subsystem (hides console window in Release)
+# Hide console in Release
 if(WIN32)
     set_target_properties(calculator PROPERTIES
         WIN32_EXECUTABLE $<CONFIG:Release>
     )
 endif()
 
-# ── Install ─────────────────────────────────────────────────────────
+# ── Install ────────────────────────────────────────────────────────
 install(TARGETS calculator RUNTIME DESTINATION bin)
