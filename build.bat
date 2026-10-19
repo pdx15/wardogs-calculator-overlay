@@ -196,7 +196,10 @@ if errorlevel 1 (
 )
 
 echo  [2/3] Configuring (SDL3 built from source)...
-cmake -B !BUILD_DIR! -G "Visual Studio 17 2022" -A x64 --fresh 2>nul
+cmake -B !BUILD_DIR! -G "Visual Studio 18 2026" -A x64 --fresh 2>nul
+if errorlevel 1 (
+    cmake -B !BUILD_DIR! -G "Visual Studio 17 2022" -A x64 --fresh 2>nul
+)
 if errorlevel 1 (
     cmake -B !BUILD_DIR! -G "Visual Studio 16 2019" -A x64 --fresh
 )
