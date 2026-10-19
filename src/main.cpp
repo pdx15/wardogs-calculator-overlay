@@ -103,7 +103,7 @@ static void trayAdd() {
     if (!g_nid.hIcon)
         g_nid.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
     if (!g_nid.hIcon)
-        g_nid.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        g_nid.hIcon = LoadIconW(nullptr, MAKEINTRESOURCEW(32512)); // IDI_APPLICATION
     wcscpy(g_nid.szTip, L"WARDOGS Artillery Calculator");
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 }
