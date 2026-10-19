@@ -20,7 +20,8 @@ constexpr double DEG = PI / 180.0;
 
 // ── Map coordinate → metres ────────────────────────────────────────────
 //  Game uses real-meter coordinates (e.g. x ∈ [-16320, 0]).
-constexpr double METRES_PER_UNIT = 1.0;
+//  1 game unit = 100 metres.
+constexpr double METRES_PER_UNIT = 100.0;
 
 // ── 2-D point (game coordinates) ──────────────────────────────────────
 struct Vec2 {
@@ -62,12 +63,12 @@ struct TerrainGrid {
     bool loaded() const { return rows > 0 && cols > 0
                                   && heights.size() == (size_t)rows * cols; }
 
-    double heightAt(double gameX, double gameY) const {
+    double heightAt(double metresX, double metresY) const {
         if (!loaded()) return 0.0;
 
-        // Map game coords → grid indices (fractional)
-        double gx = (gameX - xMin) / (xMax - xMin) * (cols - 1);
-        double gy = (gameY - yMin) / (yMax - yMin) * (rows - 1);
+        // Map metre coords → grid indices (fractional)
+        double gx = (metresX - xMin) / (xMax - xMin) * (cols - 1);
+        double gy = (metresY - yMin) / (yMax - yMin) * (rows - 1);
 
         int x0 = std::clamp((int)gx, 0, cols - 2);
         int y0 = std::clamp((int)gy, 0, rows - 2);
@@ -178,8 +179,8 @@ public:
 private:
     const Weapon* m_weapon = nullptr;
     const MapDef* m_map    = nullptr;
-    Vec2 m_origin{5, 5};
-    Vec2 m_target{5.5, 5.5};
+    Vec2 m_origin{0, 0};
+    Vec2 m_target{0, 0};
     double m_hullDeg = NAN;
     bool   m_highArc = true;
     double m_manualAdj = 0;

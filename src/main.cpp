@@ -403,18 +403,18 @@ static void drawCalculator(App& app) {
 
     ImGui::Separator();
 
-    // MIL display
+    // MIL display — always visible
     double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
     bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
 
-    if (!s.inRange) {
-        ImGui::TextColored({1,0.4f,0.4f,1}, "OUT OF RANGE");
+    if (!hasSol && !s.inRange) {
+        ImGui::TextColored({1,0.4f,0.4f,1}, "MIL: --- (OUT OF RANGE)");
     } else if (!hasSol) {
-        ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
+        ImGui::TextColored({1,0.4f,0.4f,1}, "MIL: ---");
+    } else if (!s.inRange) {
+        ImGui::TextColored({1,0.4f,0.4f,1}, "MIL:  %.0f  (OUT OF RANGE)", std::round(displayMil));
     } else {
-        ImGui::PushFont(nullptr);
         ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
-        ImGui::PopFont();
     }
 
     if (isSph && s.hasLow && s.hasHigh) {
@@ -443,7 +443,7 @@ int main(int, char**) {
     SDL_Window* window = SDL_CreateWindow(
         "WARDOGS Calculator Overlay",
         400, 620,
-        SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS
+        SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TRANSPARENT
     );
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -480,6 +480,8 @@ int main(int, char**) {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 6.0f;
     style.FrameRounding  = 4.0f;
+    // Fully opaque ImGui window (transparent only outside)
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
 
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
