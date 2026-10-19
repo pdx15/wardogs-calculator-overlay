@@ -255,6 +255,7 @@ struct App {
 
     // Result
     wd::Solution solution;
+    bool dirty = true;  // recalculate on first frame
 
     // Overlay
     bool clickThrough = false;
@@ -367,11 +368,16 @@ static void drawCalculator(App& app) {
                         && mp.y >= wp.y && mp.y <= wp.y + th);
     }
 
+    // Track if any input changed this frame
+    bool changed = false;
+
     // ── Weapon ──────────────────────────────────────────────────────
     if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
         for (int i = 0; i < 2; i++) {
-            if (ImGui::Selectable(weaponNames[i], app.weaponIdx == i))
+            if (ImGui::Selectable(weaponNames[i], app.weaponIdx == i)) {
                 app.weaponIdx = i;
+                changed = true;
+            }
         }
         ImGui::EndCombo();
     }
@@ -386,8 +392,10 @@ static void drawCalculator(App& app) {
     }
     if (ImGui::BeginCombo("Map", currentMapName)) {
         for (int i = 0; i < 3; i++) {
-            if (ImGui::Selectable(mapIds[i], std::strcmp(app.mapId, mapIds[i]) == 0))
+            if (ImGui::Selectable(mapIds[i], std::strcmp(app.mapId, mapIds[i]) == 0)) {
                 std::strcpy(app.mapId, mapIds[i]);
+                changed = true;
+            }
         }
         ImGui::EndCombo();
     }
@@ -421,16 +429,20 @@ static void drawCalculator(App& app) {
     ImGui::Text("Artillery position (m):");
     ImGui::SetNextItemWidth(140);
     ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.2f");
+    changed |= ImGui::IsItemEdited();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
     ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.2f");
+    changed |= ImGui::IsItemEdited();
 
     ImGui::Text("Target position (m):");
     ImGui::SetNextItemWidth(140);
     ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.2f");
+    changed |= ImGui::IsItemEdited();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
     ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.2f");
+    changed |= ImGui::IsItemEdited();
 
     if (ImGui::Button("Swap")) {
         std::swap(app.originX, app.targetX);
@@ -455,6 +467,7 @@ static void drawCalculator(App& app) {
                     app.loadIdx = i;
                     app.targetX = app.savedTargets[i].x;
                     app.targetY = app.savedTargets[i].y;
+                    changed = true;
                 }
             }
             ImGui::EndCombo();
@@ -469,6 +482,7 @@ static void drawCalculator(App& app) {
                                        ImGuiInputTextFlags_EnterReturnsTrue);
         if ((ImGui::Button("Save") || enter) && app.saveName[0]) {
             saveTarget(app, app.saveName);
+            app.loadIdx = (int)app.savedTargets.size() - 1;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -485,23 +499,29 @@ static void drawCalculator(App& app) {
         ImGui::Text("SPH-2 Platform Correction:");
 
         ImGui::Checkbox("Hull heading", &app.hullEnabled);
+        changed |= ImGui::IsItemEdited();
         if (app.hullEnabled) {
             ImGui::SetNextItemWidth(120);
             ImGui::InputFloat("Heading (deg)", &app.hullDeg, 0, 0, "%.1f");
+            changed |= ImGui::IsItemEdited();
             if (app.hullDeg < 0)   app.hullDeg += 360;
             if (app.hullDeg >=360) app.hullDeg -= 360;
         }
 
         ImGui::Text("Trajectory:");
         ImGui::SameLine();
-        if (ImGui::RadioButton("Low", !app.useHighArc)) app.useHighArc = false;
+        if (ImGui::RadioButton("Low", !app.useHighArc)) { app.useHighArc = false; changed = true; }
         ImGui::SameLine();
-        if (ImGui::RadioButton("High", app.useHighArc))  app.useHighArc = true;
+        if (ImGui::RadioButton("High", app.useHighArc))  { app.useHighArc = true;  changed = true; }
     }
 
     // ── Results ─────────────────────────────────────────────────────
     ImGui::Separator();
-    recalc(app);
+    app.dirty |= changed;
+    if (app.dirty) {
+        recalc(app);
+        app.dirty = false;
+    }
     auto& s = app.solution;
 
     ImGui::Text("Distance:  %.0f m  (%.2f km)", s.distanceM, s.distanceM/1000.0);
@@ -687,6 +707,9 @@ int main(int, char**) {
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
+
+        // Cap frame rate ~60fps to reduce CPU when idle
+        SDL_Delay(16);
     }
 
     trayRemove();

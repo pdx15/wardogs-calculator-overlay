@@ -33,7 +33,6 @@ jobs:
         run: |
           mkdir package
           copy build\calculator.exe package\
-          xcopy assets package\assets\ /E /I /Y
           copy README.md package\
           Compress-Archive -Path package\* -DestinationPath "wardogs-calculator-v${{ inputs.version }}.zip"
 
