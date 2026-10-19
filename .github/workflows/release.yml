@@ -23,7 +23,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure (SDL3 from source, static)
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DVERSION=${{ inputs.version }}
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DVERSION=${{ inputs.version }}"
 
       - name: Build
         run: cmake --build build --config Release
