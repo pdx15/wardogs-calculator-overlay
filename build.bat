@@ -170,19 +170,26 @@ echo  ============================================================
 REM -- Auto-detect SDL3 ---------------------------------------------
 if not "!SDL3_DIR!"=="" goto :sdl3_found
 
-REM Search paths (SDL3 zip extracts as SDL3-x.y.z/ inside the target dir)
+REM Search paths for devel packages
+REM   VC:   SDL3/cmake/, SDL3/lib/cmake/SDL3/
+REM   MinGW: SDL3/x86_64-w64-mingw32/lib/cmake/SDL3/
 for %%P in (
-    "%CD%\SDL3\SDL3-%SDL3_VERSION%"
+    "%CD%\SDL3\SDL3-devel-%SDL3_VERSION%-VC"
+    "%CD%\SDL3\SDL3-devel-%SDL3_VERSION%-mingw"
     "%CD%\SDL3"
-    "C:\SDL3\SDL3-%SDL3_VERSION%"
+    "C:\SDL3\SDL3-devel-%SDL3_VERSION%-VC"
+    "C:\SDL3\SDL3-devel-%SDL3_VERSION%-mingw"
     "C:\SDL3"
-    "C:\SDL3-%SDL3_VERSION%"
 ) do (
     if exist "%%~P\cmake\SDL3\SDL3Config.cmake" (
         set "SDL3_DIR=%%~P"
         goto :sdl3_found
     )
     if exist "%%~P\lib\cmake\SDL3\SDL3Config.cmake" (
+        set "SDL3_DIR=%%~P"
+        goto :sdl3_found
+    )
+    if exist "%%~P\x86_64-w64-mingw32\lib\cmake\SDL3\SDL3Config.cmake" (
         set "SDL3_DIR=%%~P"
         goto :sdl3_found
     )
@@ -207,16 +214,23 @@ echo.
 echo  SDL3 not found locally.
 echo.
 echo  Download from GitHub [%SDL3_VERSION%]?
-echo    1^) Yes - download SDL3-%SDL3_VERSION%-win32-x64.zip
+echo    1^) Yes - download SDL3-devel package for %COMPILER%
 echo    2^) No - I'll provide the path manually
 echo.
 set /p "DL=  Enter number [1]: "
 if "!DL!"=="2" goto :sdl3_manual
 
+REM Pick correct devel package for compiler
+if "%COMPILER%"=="vs" (
+    set "SDL3_ZIP_NAME=SDL3-devel-%SDL3_VERSION%-VC.zip"
+) else (
+    set "SDL3_ZIP_NAME=SDL3-devel-%SDL3_VERSION%-mingw.zip"
+)
+set "SDL3_ZIP=%TEMP%\!SDL3_ZIP_NAME!"
+set "SDL3_URL=https://github.com/libsdl-org/SDL/releases/download/release-%SDL3_VERSION%/!SDL3_ZIP_NAME!"
+
 echo.
-echo  Downloading SDL3 %SDL3_VERSION%...
-set "SDL3_ZIP=%TEMP%\SDL3-%SDL3_VERSION%-win32-x64.zip"
-set "SDL3_URL=https://github.com/libsdl-org/SDL/releases/download/release-%SDL3_VERSION%/SDL3-%SDL3_VERSION%-win32-x64.zip"
+echo  Downloading !SDL3_ZIP_NAME!...
 
 where curl >nul 2>&1
 if not errorlevel 1 (
@@ -261,6 +275,7 @@ if "!SDL3_DIR!"=="" (
 REM Resolve cmake config path
 set "SDL3_CMAKE=!SDL3_DIR!\cmake\SDL3"
 if exist "!SDL3_DIR!\lib\cmake\SDL3\SDL3Config.cmake" set "SDL3_CMAKE=!SDL3_DIR!\lib\cmake\SDL3"
+if exist "!SDL3_DIR!\x86_64-w64-mingw32\lib\cmake\SDL3\SDL3Config.cmake" set "SDL3_CMAKE=!SDL3_DIR!\x86_64-w64-mingw32\lib\cmake\SDL3"
 
 if not exist "!SDL3_CMAKE!\SDL3Config.cmake" (
     echo.
@@ -349,9 +364,10 @@ if errorlevel 1 (
 )
 
 set "OUTPUT=%BUILD_DIR%\calculator.exe"
-if exist "!SDL3_DIR!\bin\SDL3.dll"     copy "!SDL3_DIR!\bin\SDL3.dll"     "%BUILD_DIR%\" >nul 2>&1
-if exist "!SDL3_DIR!\lib\x64\SDL3.dll" copy "!SDL3_DIR!\lib\x64\SDL3.dll" "%BUILD_DIR%\" >nul 2>&1
-if exist "!SDL3_DIR!\SDL3.dll"         copy "!SDL3_DIR!\SDL3.dll"         "%BUILD_DIR%\" >nul 2>&1
+if exist "!SDL3_DIR!\bin\SDL3.dll"                      copy "!SDL3_DIR!\bin\SDL3.dll"                      "%BUILD_DIR%\" >nul 2>&1
+if exist "!SDL3_DIR!\lib\x64\SDL3.dll"                  copy "!SDL3_DIR!\lib\x64\SDL3.dll"                  "%BUILD_DIR%\" >nul 2>&1
+if exist "!SDL3_DIR!\SDL3.dll"                          copy "!SDL3_DIR!\SDL3.dll"                          "%BUILD_DIR%\" >nul 2>&1
+if exist "!SDL3_DIR!\x86_64-w64-mingw32\bin\SDL3.dll"   copy "!SDL3_DIR!\x86_64-w64-mingw32\bin\SDL3.dll"   "%BUILD_DIR%\" >nul 2>&1
 goto :done
 
 REM ---------------------------------------------------------------
@@ -380,7 +396,8 @@ if errorlevel 1 (
 )
 
 set "OUTPUT=%BUILD_DIR%\calculator.exe"
-if exist "!SDL3_DIR!\bin\SDL3.dll" copy "!SDL3_DIR!\bin\SDL3.dll" "%BUILD_DIR%\" >nul 2>&1
+if exist "!SDL3_DIR!\bin\SDL3.dll"                    copy "!SDL3_DIR!\bin\SDL3.dll"                    "%BUILD_DIR%\" >nul 2>&1
+if exist "!SDL3_DIR!\i686-w64-mingw32\bin\SDL3.dll"   copy "!SDL3_DIR!\i686-w64-mingw32\bin\SDL3.dll"   "%BUILD_DIR%\" >nul 2>&1
 goto :done
 
 REM ---------------------------------------------------------------
