@@ -5,6 +5,22 @@
 cmake_minimum_required(VERSION 3.20)
 project(wardogs-calculator-overlay LANGUAGES CXX C)
 
+# ── Version (passed via -DVERSION=X.Y.Z or defaults) ──────────────
+if(NOT DEFINED VERSION)
+    set(VERSION "1.0.0")
+endif()
+string(REPLACE "." ";" _ver_list "${VERSION}")
+list(GET _ver_list 0 VERSION_MAJOR)
+list(GET _ver_list 1 VERSION_MINOR)
+list(LENGTH _ver_list _ver_len)
+if(_ver_len GREATER 2)
+    list(GET _ver_list 2 VERSION_PATCH)
+else()
+    set(VERSION_PATCH 0)
+endif()
+set(VERSION_STR "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+message(STATUS "Building version: ${VERSION_STR}")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -56,9 +72,10 @@ set(APP_SOURCES
     ${IMGUI_SOURCES}
 )
 
-# Windows: embed icon resource
+# Windows: embed icon + version resource
 if(WIN32)
-    list(APPEND APP_SOURCES assets/icon.rc)
+    configure_file(assets/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/version.rc @ONLY)
+    list(APPEND APP_SOURCES assets/icon.rc ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 endif()
 
 add_executable(calculator ${APP_SOURCES})
