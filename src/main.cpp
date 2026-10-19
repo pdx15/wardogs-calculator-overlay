@@ -300,6 +300,8 @@ static void loadSavedTargets(App& app) {
     if (!f) return;
     std::string line;
     while (std::getline(f, line)) {
+        // Skip empty lines
+        if (line.empty()) continue;
         // Format: mapId:name:x:y
         auto p1 = line.find(':');
         if (p1 == std::string::npos) continue;
@@ -319,11 +321,32 @@ static void loadSavedTargets(App& app) {
 }
 
 static void saveTarget(App& app, const char* name) {
+    // Ensure file ends with newline before appending
+    {
+        std::ifstream in(getSavePath(), std::ios::ate | std::ios::binary);
+        if (in.tellg() > 0) {
+            in.seekg(-1, std::ios::end);
+            char last = 0;
+            in.get(last);
+            if (last != '\n') {
+                in.close();
+                std::ofstream out(getSavePath(), std::ios::app | std::ios::binary);
+                out << "\n";
+            }
+        }
+    }
     std::ofstream f(getSavePath(), std::ios::app);
     if (!f) return;
     f << app.mapId << ":" << name << ":" << app.targetX << ":" << app.targetY << "\n";
-    f.close();  // flush before reload
+    f.close();
     loadSavedTargets(app);
+    // Select the newly saved target
+    for (int i = 0; i < (int)app.savedTargets.size(); i++) {
+        if (std::strcmp(app.savedTargets[i].name, name) == 0) {
+            app.loadIdx = i;
+            break;
+        }
+    }
 }
 
 static void deleteSavedTarget(App& app, int idx) {
@@ -524,7 +547,6 @@ static void drawCalculator(App& app) {
                                        ImGuiInputTextFlags_EnterReturnsTrue);
         if ((ImGui::Button("Save") || enter) && app.saveName[0]) {
             saveTarget(app, app.saveName);
-            app.loadIdx = (int)app.savedTargets.size() - 1;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
