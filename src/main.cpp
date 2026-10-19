@@ -475,21 +475,23 @@ static void drawCalculator(App& app) {
 
     // ── Coordinates ─────────────────────────────────────────────────
     ImGui::Separator();
-    ImGui::Text("Artillery position (m):");
-    ImGui::SetNextItemWidth(140);
+    ImGui::Text("Origin:");
+    ImGui::SameLine(70);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(140);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
 
-    ImGui::Text("Target position (m):");
-    ImGui::SetNextItemWidth(140);
+    ImGui::Text("Target:");
+    ImGui::SameLine(70);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(140);
+    ImGui::SetNextItemWidth(90);
     ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.2f");
     changed |= ImGui::IsItemEdited();
 
@@ -560,20 +562,21 @@ static void drawCalculator(App& app) {
     bool isSph = (app.weaponIdx == 1);
     if (isSph) {
         ImGui::Separator();
-        ImGui::Text("SPH-2 Platform Correction:");
-
+        ImGui::Text("Platform:");
+        ImGui::SameLine(70);
         ImGui::Checkbox("Hull heading", &app.hullEnabled);
         changed |= ImGui::IsItemEdited();
         if (app.hullEnabled) {
-            ImGui::SetNextItemWidth(120);
-            ImGui::InputFloat("Heading (deg)", &app.hullDeg, 0, 0, "%.1f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputFloat("deg##hd", &app.hullDeg, 0, 0, "%.1f");
             changed |= ImGui::IsItemEdited();
             if (app.hullDeg < 0)   app.hullDeg += 360;
             if (app.hullDeg >=360) app.hullDeg -= 360;
         }
 
         ImGui::Text("Trajectory:");
-        ImGui::SameLine();
+        ImGui::SameLine(70);
         if (ImGui::RadioButton("Low", !app.useHighArc)) { app.useHighArc = false; changed = true; }
         ImGui::SameLine();
         if (ImGui::RadioButton("High", app.useHighArc))  { app.useHighArc = true;  changed = true; }
