@@ -73,8 +73,11 @@ If `wardogs-data` is placed next to `calculator.exe`, terrain loads automaticall
 
 | Action | Effect |
 |--------|--------|
+| F5 (default) | Toggle show / hide overlay |
 | Tray icon left-click | Toggle show / hide |
 | Tray icon right-click | Exit |
+
+The hotkey can be reassigned in the Settings panel — click the current hotkey button and press any key. Press Esc to disable.
 
 Drag the window by its title bar to move it.
 
