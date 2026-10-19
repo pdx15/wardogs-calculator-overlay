@@ -5,7 +5,7 @@ title WARDOGS Artillery Calculator - Build
 
 set "CONFIG=Release"
 set "COMPILER="
-set "BUILD_DIR=build"
+set "VERSION="
 
 REM -- Parse arguments (non-interactive mode) -----------------------
 if not "%~1"=="" (
@@ -17,6 +17,13 @@ if not "%~1"=="" (
         if /i "%%A"=="Release"  set "CONFIG=Release"
         if /i "%%A"=="--help"   goto :help
         if /i "%%A"=="-h"       goto :help
+        echo %%A | findstr /i "^v=" >nul 2>&1
+        if not errorlevel 1 set "VERSION=%%A"
+    )
+    if not "!VERSION!"=="" (
+        REM Strip "v=" prefix if present
+        set "VERSION=!VERSION:v=!"
+        set "VERSION=!VERSION:==!"
     )
     if not "!COMPILER!"=="" goto :check_cmake
 )
@@ -90,7 +97,7 @@ if not "!COMPILER!"=="" goto :compiler_done
 REM -- Compiler menu ------------------------------------------------
 echo.
 echo  ============================================================
-echo            WARDOGS Artillery Calculator - Build
+echo           WARDOGS Artillery Calculator - Build
 echo  ============================================================
 echo    Detected compilers:
 if "!HAS_VS!"=="1"      (echo    [x] Visual Studio MSVC)       else (echo    [ ] Visual Studio MSVC)
@@ -157,12 +164,27 @@ echo.
 set /p "CFG=  Enter number [1]: "
 if "!CFG!"=="2" set "CONFIG=Debug"
 
+REM -- Version input (interactive only) ------------------------------
+if "!VERSION!"=="" (
+    echo.
+    set /p "VERSION=  Version (x.y.z) [1.0.0]: "
+    if "!VERSION!"=="" set "VERSION=1.0.0"
+)
+
 :config_done
+if "!VERSION!"=="" set "VERSION=1.0.0"
+
+REM -- Set build directory per compiler ------------------------------
+if "!COMPILER!"=="vs"      set "BUILD_DIR=build-vs"
+if "!COMPILER!"=="mingw64" set "BUILD_DIR=build-mingw64"
+if "!COMPILER!"=="mingw32" set "BUILD_DIR=build-mingw32"
 
 echo.
 echo  ============================================================
 echo   Compiler:  !COMPILER!
 echo   Config:    !CONFIG!
+echo   Version:   !VERSION!
+echo   Build dir: !BUILD_DIR!
 echo   SDL3:      built from source (static, no DLL needed)
 echo  ============================================================
 echo.
@@ -196,9 +218,7 @@ if errorlevel 1 (
 )
 
 echo  [2/3] Configuring (SDL3 built from source)...
-if exist "!BUILD_DIR!\CMakeCache.txt" del /q "!BUILD_DIR!\CMakeCache.txt"
-if exist "!BUILD_DIR!\CMakeFiles" rd /s /q "!BUILD_DIR!\CMakeFiles"
-cmake -B !BUILD_DIR! -G Ninja -DCMAKE_BUILD_TYPE=!CONFIG!
+cmake -B !BUILD_DIR! -G Ninja -DCMAKE_BUILD_TYPE=!CONFIG! "-DVERSION=!VERSION!"
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
@@ -225,9 +245,7 @@ if exist "C:\mingw64\bin\g++.exe"          set "PATH=C:\mingw64\bin;!PATH!"
 if exist "C:\mingw\bin\g++.exe"            set "PATH=C:\mingw\bin;!PATH!"
 
 echo  [1/3] Configuring (MinGW-w64, SDL3 built from source)...
-if exist "!BUILD_DIR!\CMakeCache.txt" del /q "!BUILD_DIR!\CMakeCache.txt"
-if exist "!BUILD_DIR!\CMakeFiles" rd /s /q "!BUILD_DIR!\CMakeFiles"
-cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG!
+cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG! "-DVERSION=!VERSION!"
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
@@ -253,11 +271,8 @@ if exist "C:\mingw32\mingw32\bin\g++.exe"  set "PATH=C:\mingw32\mingw32\bin;!PAT
 if exist "C:\mingw32\bin\g++.exe"          set "PATH=C:\mingw32\bin;!PATH!"
 if exist "C:\MinGW\bin\g++.exe"            set "PATH=C:\MinGW\bin;!PATH!"
 
-set "BUILD_DIR=build32"
 echo  [1/3] Configuring (MinGW32, SDL3 built from source)...
-if exist "!BUILD_DIR!\CMakeCache.txt" del /q "!BUILD_DIR!\CMakeCache.txt"
-if exist "!BUILD_DIR!\CMakeFiles" rd /s /q "!BUILD_DIR!\CMakeFiles"
-cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG!
+cmake -B !BUILD_DIR! -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=!CONFIG! "-DVERSION=!VERSION!"
 if errorlevel 1 (
     echo  [ERROR] CMake configure failed.
     pause
@@ -283,6 +298,7 @@ echo  ============================================================
 echo   BUILD SUCCESSFUL
 echo  ============================================================
 echo   Output:  !OUTPUT!
+echo   Version: !VERSION!
 echo   DLL:     none (SDL3 statically linked)
 echo.
 echo   Run: place wardogs-data/ next to calculator.exe
@@ -304,14 +320,15 @@ echo  Interactive mode (double-click):
 echo    build.bat
 echo.
 echo  Command-line mode:
-echo    build.bat [COMPILER] [CONFIG]
+echo    build.bat [COMPILER] [CONFIG] [v=X.Y.Z]
 echo.
 echo    COMPILER:   vs, mingw64, mingw32
 echo    CONFIG:     Release or Debug
+echo    VERSION:    v=X.Y.Z (embedded in exe as file version)
 echo.
 echo  Examples:
 echo    build.bat
 echo    build.bat vs
-echo    build.bat mingw64 Debug
+echo    build.bat mingw64 Debug v=1.2.3
 echo.
 pause
