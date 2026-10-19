@@ -823,8 +823,11 @@ int main(int, char**) {
         }
 
         if (!app.visible) {
+            SDL_HideWindow(window);
             SDL_Delay(50);
             continue;
+        } else {
+            SDL_ShowWindow(window);
         }
 
         // Smooth drag: update window position every frame from global mouse
@@ -832,6 +835,15 @@ int main(int, char**) {
             float mx, my;
             SDL_GetGlobalMouseState(&mx, &my);
             SDL_SetWindowPosition(window, (int)mx - dragOffX, (int)my - dragOffY);
+        }
+
+        // Process Win32 messages for tray window (hotkey, tray icon)
+        {
+            MSG msg;
+            while (PeekMessageW(&msg, g_hwndTray, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
         }
 
         ImGui_ImplSDLRenderer3_NewFrame();
