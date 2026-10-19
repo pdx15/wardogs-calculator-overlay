@@ -43,3 +43,4 @@ Thumbs.db
 vcpkg_installed/
 Testing/
 /wardogs-data/assets
+imgui.ini
