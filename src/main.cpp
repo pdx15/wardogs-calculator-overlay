@@ -222,7 +222,6 @@ struct App {
     float hullDeg = 0.0f;
     bool  hullEnabled = false;
     bool  useHighArc = true;
-    float manualAdj = 0.0f;
 
     // Terrain
     bool  terrainLoaded = false;
@@ -272,7 +271,7 @@ static void recalc(App& app) {
     app.calc.setTarget({(double)app.targetX, (double)app.targetY});
     app.calc.setHullHeading(app.hullEnabled ? (double)app.hullDeg : NAN);
     app.calc.setUseHighArc(app.useHighArc);
-    app.calc.setManualMilAdj((double)app.manualAdj);
+    app.calc.setManualMilAdj(0);
 
     if (std::strcmp(app.mapId, app.lastMapId) != 0) {
         tryLoadTerrain(app);
@@ -315,39 +314,44 @@ static void drawCalculator(App& app) {
     }
 
     // ── Terrain ─────────────────────────────────────────────────────
-    ImGui::Separator();
-    ImGui::Text("wardogs-data:");
-    ImGui::SetNextItemWidth(260);
-    if (ImGui::InputText("##ddir", app.dataDir, sizeof(app.dataDir),
-                         ImGuiInputTextFlags_EnterReturnsTrue)) {
-        tryLoadTerrain(app);
+    if (app.terrainLoaded) {
+        ImGui::Separator();
+        ImGui::TextColored({0.3f,1,0.3f,1}, "Terrain: OK");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("change")) {
+            app.terrainLoaded = false;
+        }
+    } else {
+        ImGui::Separator();
+        ImGui::Text("wardogs-data:");
+        ImGui::SetNextItemWidth(260);
+        if (ImGui::InputText("##ddir", app.dataDir, sizeof(app.dataDir),
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+            tryLoadTerrain(app);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load")) {
+            tryLoadTerrain(app);
+        }
+        if (app.statusMsg[0])
+            ImGui::TextWrapped("%s", app.statusMsg);
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Load")) {
-        tryLoadTerrain(app);
-    }
-    ImGui::SameLine();
-    ImGui::TextColored(app.terrainLoaded
-        ? ImVec4(0.3f,1,0.3f,1) : ImVec4(1,0.5f,0.3f,1),
-        app.terrainLoaded ? "OK" : "---");
-    if (app.statusMsg[0])
-        ImGui::TextWrapped("%s", app.statusMsg);
 
     // ── Coordinates ─────────────────────────────────────────────────
     ImGui::Separator();
     ImGui::Text("Artillery position (m):");
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.0f");
+    ImGui::InputFloat("X##ox", &app.originX, 0, 0, "%.1f");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.0f");
+    ImGui::InputFloat("Y##oy", &app.originY, 0, 0, "%.1f");
 
     ImGui::Text("Target position (m):");
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.0f");
+    ImGui::InputFloat("X##tx", &app.targetX, 0, 0, "%.1f");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
-    ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.0f");
+    ImGui::InputFloat("Y##ty", &app.targetY, 0, 0, "%.1f");
 
     if (ImGui::Button("Swap")) {
         std::swap(app.originX, app.targetX);
@@ -373,9 +377,6 @@ static void drawCalculator(App& app) {
         if (ImGui::RadioButton("Low", !app.useHighArc)) app.useHighArc = false;
         ImGui::SameLine();
         if (ImGui::RadioButton("High", app.useHighArc))  app.useHighArc = true;
-
-        ImGui::SetNextItemWidth(120);
-        ImGui::InputFloat("Manual MIL adj", &app.manualAdj, 0, 0, "%.1f");
     }
 
     // ── Results ─────────────────────────────────────────────────────
