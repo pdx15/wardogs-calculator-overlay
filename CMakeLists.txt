@@ -1,5 +1,5 @@
 # =====================================================================
-#  CMakeLists.txt  —  WARDOGS Artillery Calculator Overlay
+#  CMakeLists.txt — WARDOGS Artillery Calculator Overlay (SDL3 + ImGui)
 # =====================================================================
 
 cmake_minimum_required(VERSION 3.20)
@@ -14,17 +14,19 @@ include(FetchContent)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG        v1.91.8
+    GIT_TAG        v1.93.0
     GIT_SHALLOW    TRUE
 )
-FetchContent_MakeAvailable(imgui)
 
-# ── Find SDL2 ───────────────────────────────────────────────────────
+# ── Find SDL3 ───────────────────────────────────────────────────────
 #  Option 1: vcpkg  →  cmake -DCMAKE_TOOLCHAIN_FILE=...
-#  Option 2: system  →  apt install libsdl2-dev  /  brew install sdl2
-#  Option 3: manual  →  cmake -DSDL2_DIR=C:/SDL2/cmake
+#  Option 2: manual →  cmake -DSDL3_DIR=C:/SDL3/cmake
+#  Option 3: system →  apt install libsdl3-dev
 
-find_package(SDL2 REQUIRED)
+find_package(SDL3 REQUIRED CONFIG)
+
+# ── Fetch ImGui after SDL3 is found ─────────────────────────────────
+FetchContent_MakeAvailable(imgui)
 
 # ── ImGui sources ───────────────────────────────────────────────────
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
@@ -34,8 +36,8 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer2.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer3.cpp
 )
 
 # ── Executable ──────────────────────────────────────────────────────
@@ -51,7 +53,7 @@ target_include_directories(calculator PRIVATE
     src
 )
 
-target_link_libraries(calculator PRIVATE SDL2::SDL2)
+target_link_libraries(calculator PRIVATE SDL3::SDL3)
 
 # Windows: link shell32 for tray icon, gdi32 for icon handling
 if(WIN32)
