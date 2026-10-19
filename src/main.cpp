@@ -285,7 +285,7 @@ struct App {
 
     // Saved targets
     std::vector<SavedTarget> savedTargets;
-    int   loadIdx = 0;
+    int   loadIdx = -1;  // -1 = nothing selected
     char  saveName[64] = "";
 
     // Result
@@ -417,8 +417,11 @@ static void deleteSavedTarget(App& app, int idx) {
         for (auto& l : lines) f << l << "\n";
     }
     loadSavedTargets(app);
-    if (app.loadIdx >= (int)app.savedTargets.size())
-        app.loadIdx = std::max(0, (int)app.savedTargets.size() - 1);
+    if (app.savedTargets.empty()) {
+        app.loadIdx = -1;
+    } else if (app.loadIdx >= (int)app.savedTargets.size()) {
+        app.loadIdx = (int)app.savedTargets.size() - 1;
+    }
 }
 
 static void recalc(App& app) {
@@ -433,7 +436,7 @@ static void recalc(App& app) {
     if (std::strcmp(app.mapId, app.lastMapId) != 0) {
         tryLoadTerrain(app);
         loadSavedTargets(app);
-        app.loadIdx = 0;
+        app.loadIdx = -1;
     }
 
     app.solution = app.calc.solve();
@@ -571,7 +574,7 @@ static void drawCalculator(App& app) {
     {
         const char* preview = app.savedTargets.empty()
             ? "(no saved targets)"
-            : (app.loadIdx < (int)app.savedTargets.size()
+            : (app.loadIdx >= 0 && app.loadIdx < (int)app.savedTargets.size()
                 ? app.savedTargets[app.loadIdx].name : "(select)");
         ImGui::SetNextItemWidth(160);
         if (ImGui::BeginCombo("##load", preview)) {
@@ -594,6 +597,7 @@ static void drawCalculator(App& app) {
         ImGui::PushStyleColor(ImGuiCol_Button, red);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, redHover);
         bool canDel = !app.savedTargets.empty()
+                   && app.loadIdx >= 0
                    && app.loadIdx < (int)app.savedTargets.size();
         if (!canDel) ImGui::BeginDisabled();
         if (ImGui::Button("Del")) {
