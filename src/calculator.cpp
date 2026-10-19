@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 
@@ -546,9 +547,138 @@ Solution Calculator::solve() const {
     // Manual adjustment
     double manual = m_manualAdj;
 
-    // Final MIL
+    // Final MIL (base: flat + platform correction)
     s.finalLowMil  = s.flatLowMil  + s.hullCorrectionLowMil  + manual;
-    s.finalHighMil = s.flatHighMil + s.hullCorrectionHighMil + fieldCal + manual;
+    s.finalHighMil = s.flatHighMil + s.hullCorrectionHighMil + manual;
+
+    // ── Numerical terrain correction (RK4 physics solver) ─────────
+    // Replaces fieldCalibrationMil for all distances and deltaZ values.
+    // Uses the same physics model as Apollyon's terrain-height-solver.
+    if (m_terrain.loaded() && m_weapon && std::strcmp(m_weapon->id, "spg") == 0
+        && std::isfinite(s.deltaZ) && std::abs(s.deltaZ) > 0.5) {
+
+        struct TrajectoryModel { double speed, gravity, drag, offset; };
+        // "full" fitted models from Apollyon solver
+        static const TrajectoryModel kHigh = {
+            9389.43881652221, 147.2063947858103, 0.0008516971618643472, -960.0413878819479
+        };
+        static const TrajectoryModel kLow = {
+            300.0, 8.85397505384648, 0.0007351626163587786, 95.03019643400405
+        };
+
+        // Speed-dependent drag coefficient (Cd multiplier)
+        static const double gcX[] = {0,30,61,91,122,150,183,213,244,274,
+                                     300,335,366,396,427,450,488,518,549,579,600};
+        static const double gcY[] = {.71,.69,.66,.64,.65,.66,.68,.72,.80,.92,
+                                     1.10,1.25,1.33,1.39,1.44,1.48,1.50,1.54,1.57,1.58,1.60};
+        constexpr int GC_N = 21;
+
+        auto dragCoeff = [](double speed) -> double {
+            if (speed <= gcX[0]) return gcY[0];
+            if (speed >= gcX[GC_N - 1]) return gcY[GC_N - 1];
+            int lo = 0, hi = GC_N - 1;
+            while (lo + 1 < hi) { int mid = (lo + hi) >> 1; if (gcX[mid] <= speed) lo = mid; else hi = mid; }
+            double f = (speed - gcX[lo]) / (gcX[hi] - gcX[lo]);
+            return gcY[lo] + (gcY[hi] - gcY[lo]) * f;
+        };
+
+        // RK4 trajectory: returns height at given horizontal distance
+        auto heightAtDist = [&](double angle, double dist,
+                                const TrajectoryModel& m) -> double {
+            if (angle <= 0 || angle >= PI / 2.0 || dist <= 0) return NAN;
+            double x = 0, z = 0;
+            double vx = m.speed * std::cos(angle);
+            double vz = m.speed * std::sin(angle);
+            const double g = m.gravity, dt = 0.02;
+            for (int i = 0; i < 6000; i++) {
+                auto acc = [&](double vx_, double vz_, double& ax_, double& az_) {
+                    double q = m.drag * dragCoeff(std::hypot(vx_, vz_)) * std::hypot(vx_, vz_);
+                    ax_ = -q * vx_;  az_ = -g - q * vz_;
+                };
+                double a1x,a1z,a2x,a2z,a3x,a3z,a4x,a4z;
+                acc(vx, vz, a1x, a1z);
+                double v2x=vx+a1x*dt/2, v2z=vz+a1z*dt/2; acc(v2x,v2z,a2x,a2z);
+                double v3x=vx+a2x*dt/2, v3z=vz+a2z*dt/2; acc(v3x,v3z,a3x,a3z);
+                double v4x=vx+a3x*dt,   v4z=vz+a3z*dt;   acc(v4x,v4z,a4x,a4z);
+                double nx = x + dt*(vx + 2*v2x + 2*v3x + v4x)/6;
+                double nz = z + dt*(vz + 2*v2z + 2*v3z + v4z)/6;
+                if (!std::isfinite(nx) || !std::isfinite(nz)) return NAN;
+                if (nx >= dist) return z + (nz-z)*(dist-x)/(nx-x) + m.offset;
+                vx += dt*(a1x + 2*a2x + 2*a3x + a4x)/6;
+                vz += dt*(a1z + 2*a2z + 2*a3z + a4z)/6;
+                x = nx; z = nz;
+                if (vx <= 1e-7) return NAN;
+            }
+            return NAN;
+        };
+
+        // Bisection solver
+        auto bisect = [&](std::function<double(double)> fn,
+                          double lo, double hi, double tol) -> double {
+            double fl=fn(lo), fh=fn(hi);
+            if (!std::isfinite(fl)||!std::isfinite(fh)||fl*fh>0) return NAN;
+            if (std::abs(fl)<1e-8) return lo;
+            if (std::abs(fh)<1e-8) return hi;
+            for (int i=0; i<50 && (hi-lo)>tol; i++) {
+                double mid=(lo+hi)/2, fm=fn(mid);
+                if (!std::isfinite(fm)) return NAN;
+                if (std::abs(fm)<1e-8) return mid;
+                if (fl*fm<=0) { hi=mid; fh=fm; } else { lo=mid; fl=fm; }
+            }
+            return (lo+hi)/2;
+        };
+
+        auto solveArc = [&](const TrajectoryModel& model,
+                            double flatMil, double distM, double dz,
+                            double minMil, double maxMil) -> double {
+            double flatRad = flatMil / 1000.0;
+            // 1) Find reference angle (flat terrain, height=0)
+            double refAngle = NAN, bestErr = 1e9;
+            for (double r = std::max(minMil/1000.0, flatRad-0.3);
+                 r <= std::min(maxMil/1000.0, flatRad+0.3); r += 0.0005) {
+                double h = heightAtDist(r, distM, model);
+                if (std::isfinite(h) && std::abs(h) < std::abs(bestErr)) {
+                    bestErr = h; refAngle = r;
+                    if (std::abs(h) < 0.05) break;
+                }
+            }
+            if (!std::isfinite(refAngle)) return NAN;
+
+            // 2) Find corrected MIL where trajectory height = dz
+            auto cmdFn = [&](double mil) -> double {
+                double h = heightAtDist(refAngle + (mil - flatMil)/1000.0, distM, model);
+                return std::isfinite(h) ? h - dz : NAN;
+            };
+            // Scan for sign change
+            double prevM=NAN, prevV=NAN, corrected=NAN;
+            for (double m = minMil; m <= maxMil; m += 10) {
+                double v = cmdFn(m);
+                if (std::isfinite(v) && std::abs(v) < 0.05) { corrected = m; break; }
+                if (std::isfinite(v) && std::isfinite(prevV) && prevV * v <= 0) {
+                    double root = bisect(cmdFn, prevM, m, 0.025);
+                    if (std::isfinite(root)) { corrected = root; break; }
+                }
+                prevM = m; prevV = v;
+            }
+            return corrected;
+        };
+
+        double distM = s.distanceM;
+        double dz = s.deltaZ;
+
+        // High arc correction
+        if (s.hasHigh) {
+            double corr = solveArc(kHigh, s.flatHighMil, distM, dz, 610, 1390);
+            if (std::isfinite(corr))
+                s.finalHighMil = corr + s.hullCorrectionHighMil + manual;
+        }
+        // Low arc correction
+        if (s.hasLow) {
+            double corr = solveArc(kLow, s.flatLowMil, distM, dz, 20, 600);
+            if (std::isfinite(corr))
+                s.finalLowMil = corr + s.hullCorrectionLowMil + manual;
+        }
+    }
 
     s.useHighArc = m_highArc;
 

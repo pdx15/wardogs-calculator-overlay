@@ -14,39 +14,17 @@ Displays MIL, azimuth, and distance with full terrain height correction.
 
 ## Build
 
-### Prerequisites
+Run `build.bat` and select your compiler from the menu. CMake, SDL3 and ImGui are downloaded and built automatically — no manual dependencies.
 
-- CMake 3.20+
-- C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+)
-- SDL2
+### Terrain data
 
-#### Windows (MSYS2 / MinGW)
+For terrain height correction, download the heightmap PNGs and place them into the corresponding `wardogs-data` folder:
 
-```bash
-pacman -S mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc mingw-w64-x86_64-sdl2
 ```
-
-#### Windows (vcpkg)
-
-```bash
-vcpkg install sdl2
+wardogs-data/assets/maps/europe/heightmap.png
+wardogs-data/assets/maps/kavkazi/heightmap.png
+wardogs-data/assets/maps/north-america/heightmap.png
 ```
-
-#### Linux
-
-```bash
-sudo apt install cmake g++ libsdl2-dev   # Debian/Ubuntu
-```
-
-### Build
-
-```bash
-mkdir build && cd build
-cmake .. -G "MinGW Makefiles"    # or "Visual Studio 17 2022", "Unix Makefiles"
-cmake --build . --config Release
-```
-
-Output: `build/calculator.exe` (or `build/calculator` on Linux)
 
 ### Loading in the app
 

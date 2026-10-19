@@ -29,6 +29,7 @@ static NOTIFYICONDATAW g_nid{};
 static HWND  g_hwndTray = nullptr;
 static UINT  g_taskbarRestart = 0;
 static bool* g_visiblePtr = nullptr;
+static bool  g_titleBarHover = false;
 
 static void trayAdd();
 static void trayRemove();
@@ -225,6 +226,11 @@ static std::string findWardogsData() {
 }
 
 // ── Application state ──────────────────────────────────────────────────
+struct SavedTarget {
+    char name[64];
+    float x, y;
+};
+
 struct App {
     wd::Calculator calc;
 
@@ -241,6 +247,11 @@ struct App {
     char  dataDir[512] = "";
     char  lastMapId[16] = "";
     char  statusMsg[256] = "";
+
+    // Saved targets
+    std::vector<SavedTarget> savedTargets;
+    int   loadIdx = 0;
+    char  saveName[64] = "";
 
     // Result
     wd::Solution solution;
@@ -277,6 +288,49 @@ static void tryLoadTerrain(App& app) {
     std::strcpy(app.lastMapId, app.mapId);
 }
 
+// ── Saved targets file I/O ──────────────────────────────────────────
+static std::string getSavePath() {
+    return getExeDir() + "/saved_targets.txt";
+}
+
+static void loadSavedTargets(App& app) {
+    app.savedTargets.clear();
+    std::ifstream f(getSavePath());
+    if (!f) return;
+    std::string line;
+    while (std::getline(f, line)) {
+        // Format: mapId:name:x:y
+        auto p1 = line.find(':');
+        if (p1 == std::string::npos) continue;
+        auto p2 = line.find(':', p1 + 1);
+        if (p2 == std::string::npos) continue;
+        auto p3 = line.find(':', p2 + 1);
+        if (p3 == std::string::npos) continue;
+        SavedTarget t{};
+        std::string map = line.substr(0, p1);
+        std::string name = line.substr(p1 + 1, p2 - p1 - 1);
+        t.x = std::strtof(line.substr(p2 + 1, p3 - p2 - 1).c_str(), nullptr);
+        t.y = std::strtof(line.substr(p3 + 1).c_str(), nullptr);
+        if (map != app.mapId) continue;
+        std::strncpy(t.name, name.c_str(), sizeof(t.name) - 1);
+        app.savedTargets.push_back(t);
+    }
+}
+
+static void saveTarget(App& app, const char* name) {
+    // Append to file
+    std::ofstream f(getSavePath(), std::ios::app);
+    if (!f) return;
+    f << app.mapId << ":" << name << ":" << app.targetX << ":" << app.targetY << "\n";
+    // Reload to refresh list
+    loadSavedTargets(app);
+}
+
+static void loadTargetFileAll(App& app) {
+    // Load all targets from file for the current map
+    loadSavedTargets(app);
+}
+
 static void recalc(App& app) {
     app.calc.setWeapon(weaponIds[app.weaponIdx]);
     app.calc.setMap(app.mapId);
@@ -288,6 +342,8 @@ static void recalc(App& app) {
 
     if (std::strcmp(app.mapId, app.lastMapId) != 0) {
         tryLoadTerrain(app);
+        loadSavedTargets(app);
+        app.loadIdx = 0;
     }
 
     app.solution = app.calc.solve();
@@ -300,6 +356,16 @@ static void drawCalculator(App& app) {
 
     ImGui::Begin("WARDOGS Artillery Calculator", nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+
+    // Title bar hover detection for window dragging
+    {
+        ImVec2 wp = ImGui::GetWindowPos();
+        ImVec2 ws = ImGui::GetWindowSize();
+        float  th = ImGui::GetFrameHeight();
+        ImVec2 mp = ImGui::GetIO().MousePos;
+        g_titleBarHover = (mp.x >= wp.x && mp.x <= wp.x + ws.x
+                        && mp.y >= wp.y && mp.y <= wp.y + th);
+    }
 
     // ── Weapon ──────────────────────────────────────────────────────
     if (ImGui::BeginCombo("Weapon", weaponNames[app.weaponIdx])) {
@@ -370,6 +436,47 @@ static void drawCalculator(App& app) {
         std::swap(app.originX, app.targetX);
         std::swap(app.originY, app.targetY);
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Save")) {
+        ImGui::OpenPopup("Save Target");
+        std::memset(app.saveName, 0, sizeof(app.saveName));
+    }
+    ImGui::SameLine();
+    // Load combo — shows saved targets for current map
+    {
+        const char* preview = app.savedTargets.empty()
+            ? "(no saved targets)"
+            : (app.loadIdx < (int)app.savedTargets.size()
+                ? app.savedTargets[app.loadIdx].name : "(select)");
+        ImGui::SetNextItemWidth(160);
+        if (ImGui::BeginCombo("##load", preview)) {
+            for (int i = 0; i < (int)app.savedTargets.size(); i++) {
+                if (ImGui::Selectable(app.savedTargets[i].name, app.loadIdx == i)) {
+                    app.loadIdx = i;
+                    app.targetX = app.savedTargets[i].x;
+                    app.targetY = app.savedTargets[i].y;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+
+    // Save Target popup
+    if (ImGui::BeginPopup("Save Target")) {
+        ImGui::Text("Target name:");
+        ImGui::SetNextItemWidth(200);
+        bool enter = ImGui::InputText("##sname", app.saveName, sizeof(app.saveName),
+                                       ImGuiInputTextFlags_EnterReturnsTrue);
+        if ((ImGui::Button("Save") || enter) && app.saveName[0]) {
+            saveTarget(app, app.saveName);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     // ── SPH-2 controls ──────────────────────────────────────────────
     bool isSph = (app.weaponIdx == 1);
@@ -410,19 +517,12 @@ static void drawCalculator(App& app) {
     double displayMil = s.useHighArc ? s.finalHighMil : s.finalLowMil;
     bool hasSol = s.useHighArc ? s.hasHigh : s.hasLow;
 
-    if (!hasSol && !s.inRange) {
-        ImGui::TextColored({1,0.4f,0.4f,1}, "MIL: --- (OUT OF RANGE)");
+    if (!s.inRange) {
+        ImGui::TextColored({1,0.4f,0.4f,1}, "OUT OF RANGE");
     } else if (!hasSol) {
-        ImGui::TextColored({1,0.4f,0.4f,1}, "MIL: ---");
-    } else if (!s.inRange) {
-        ImGui::TextColored({1,0.4f,0.4f,1}, "MIL:  %.0f  (OUT OF RANGE)", std::round(displayMil));
+        ImGui::TextColored({1,0.4f,0.4f,1}, "NO FIRING SOLUTION");
     } else {
         ImGui::TextColored({0.5f,1,0.6f,1}, "MIL:  %.0f", std::round(displayMil));
-    }
-
-    if (isSph && s.hasLow && s.hasHigh) {
-        ImGui::Text("Low:   %.0f MIL", std::round(s.finalLowMil));
-        ImGui::Text("High:  %.0f MIL", std::round(s.finalHighMil));
     }
 
     if (isSph && app.hullEnabled) {
@@ -513,10 +613,11 @@ int main(int, char**) {
             tryLoadTerrain(app);
         }
     }
+    loadSavedTargets(app);
 
-    // Window dragging state (drag the borderless SDL window manually)
+    // Window dragging state
     bool dragging = false;
-    float dragStartX = 0, dragStartY = 0;
+    int dragStartX = 0, dragStartY = 0;
     int winStartX = 0, winStartY = 0;
 
     bool running = true;
@@ -529,13 +630,14 @@ int main(int, char**) {
                 running = false;
             }
 
-            // Window dragging: any mouse press+move drags the borderless window
+            // Window dragging: title bar click moves the borderless SDL window
+            // g_titleBarHover is set each frame by drawCalculator()
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
                 && event.button.button == SDL_BUTTON_LEFT
-                && !ImGui::GetIO().WantCaptureMouse) {
+                && g_titleBarHover) {
                 dragging = true;
-                dragStartX = (float)event.button.x;
-                dragStartY = (float)event.button.y;
+                dragStartX = event.button.x;
+                dragStartY = event.button.y;
                 SDL_GetWindowPosition(window, &winStartX, &winStartY);
             }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP
@@ -543,8 +645,8 @@ int main(int, char**) {
                 dragging = false;
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION && dragging) {
-                int dx = (int)(event.motion.x - dragStartX);
-                int dy = (int)(event.motion.y - dragStartY);
+                int dx = event.motion.x - dragStartX;
+                int dy = event.motion.y - dragStartY;
                 SDL_SetWindowPosition(window, winStartX + dx, winStartY + dy);
             }
 
