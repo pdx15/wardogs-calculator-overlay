@@ -171,14 +171,11 @@ REM -- Auto-detect SDL3 ---------------------------------------------
 if not "!SDL3_DIR!"=="" goto :sdl3_found
 
 REM Search paths for devel packages
-REM   VC:   SDL3/cmake/, SDL3/lib/cmake/SDL3/
-REM   MinGW: SDL3/x86_64-w64-mingw32/lib/cmake/SDL3/
+REM   zip extracts as SDL3-{version}/ inside the target folder
 for %%P in (
-    "%CD%\SDL3\SDL3-devel-%SDL3_VERSION%-VC"
-    "%CD%\SDL3\SDL3-devel-%SDL3_VERSION%-mingw"
+    "%CD%\SDL3\SDL3-%SDL3_VERSION%"
     "%CD%\SDL3"
-    "C:\SDL3\SDL3-devel-%SDL3_VERSION%-VC"
-    "C:\SDL3\SDL3-devel-%SDL3_VERSION%-mingw"
+    "C:\SDL3\SDL3-%SDL3_VERSION%"
     "C:\SDL3"
 ) do (
     if exist "%%~P\cmake\SDL3\SDL3Config.cmake" (
