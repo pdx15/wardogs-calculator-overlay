@@ -50,11 +50,18 @@ set(IMGUI_SOURCES
 )
 
 # ── Executable ─────────────────────────────────────────────────────
-add_executable(calculator
+set(APP_SOURCES
     src/main.cpp
     src/calculator.cpp
     ${IMGUI_SOURCES}
 )
+
+# Windows: embed icon resource
+if(WIN32)
+    list(APPEND APP_SOURCES assets/icon.rc)
+endif()
+
+add_executable(calculator ${APP_SOURCES})
 
 target_include_directories(calculator PRIVATE
     ${IMGUI_DIR}
