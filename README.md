@@ -12,21 +12,6 @@ Displays MIL, azimuth, and distance with full terrain height correction.
 - **Always-on-top overlay** — F10 hide, F11 click-through, F12 reset
 - **System tray icon** — left-click toggles overlay, right-click for menu
 
-## Supported maps
-
-| Map | World folder |
-|-----|-------------|
-| Bakurani | kavkazi |
-| Ozeti | europe |
-| Zestafona | north-america |
-
-## Weapons
-
-| Weapon | ID | Arc |
-|--------|-----|-----|
-| L81 Mortar | mortar | single |
-| SPH-2 | spg | low / high |
-
 ## Build
 
 Run `build.bat` and select your compiler from the menu. CMake, SDL3 and ImGui are downloaded and built automatically — no manual dependencies.
