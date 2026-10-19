@@ -6,6 +6,7 @@ out/
 
 # ── Build ──────────────────────────────────────────────────────────
 build/
+build32/
 build-*/
 CMakeFiles/
 CMakeCache.txt
