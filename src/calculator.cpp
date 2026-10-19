@@ -573,7 +573,7 @@ Solution Calculator::solve() const {
                                      1.10,1.25,1.33,1.39,1.44,1.48,1.50,1.54,1.57,1.58,1.60};
         constexpr int GC_N = 21;
 
-        auto dragCoeff = [](double speed) -> double {
+        auto dragCoeff = [GC_N](double speed) -> double {
             if (speed <= gcX[0]) return gcY[0];
             if (speed >= gcX[GC_N - 1]) return gcY[GC_N - 1];
             int lo = 0, hi = GC_N - 1;
