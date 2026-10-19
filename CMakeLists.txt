@@ -111,7 +111,9 @@ if(WIN32)
     set_target_properties(calculator PROPERTIES
         WIN32_EXECUTABLE $<CONFIG:Release>
     )
-    # Use main() entry point with /subsystem:windows
+endif()
+# MSVC needs /ENTRY:mainCRTStartup for int main() with /subsystem:windows
+if(MSVC)
     target_link_options(calculator PRIVATE $<$<CONFIG:Release>:/ENTRY:mainCRTStartup>)
 endif()
 
